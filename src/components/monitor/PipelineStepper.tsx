@@ -5,7 +5,7 @@ import {
   Step,
   StepLabel,
   Box,
-  StepIconProps,
+  type StepIconProps,
   styled,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
