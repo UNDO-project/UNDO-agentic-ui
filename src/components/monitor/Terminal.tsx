@@ -1,9 +1,8 @@
-// src/components/monitor/Terminal.tsx
 import React, { useEffect, useRef } from "react";
-import { Box, Typography } from "@mui/material";
+import type { WebSocketMessage } from "../../types/api";
 
 interface TerminalProps {
-  logs: string[];
+  logs: WebSocketMessage[];
 }
 
 const Terminal: React.FC<TerminalProps> = ({ logs }) => {
@@ -14,30 +13,35 @@ const Terminal: React.FC<TerminalProps> = ({ logs }) => {
   }, [logs]);
 
   return (
-    <Box
-      className="w-full p-4 overflow-hidden bg-gray-900 rounded-lg shadow-inner"
-      sx={{ height: "400px", display: "flex", flexDirection: "column" }}
-    >
-      <Typography
-        variant="caption"
-        className="block mb-2 font-mono text-gray-400 uppercase border-b border-gray-700"
-      >
-        Live Pipeline Logs
-      </Typography>
-      <Box className="flex-1 overflow-y-auto font-mono text-sm text-green-400">
-        {logs.length === 0 ? (
-          <span className="text-gray-600 italic">Waiting for logs...</span>
-        ) : (
-          logs.map((log, index) => (
-            <div key={index} className="break-all whitespace-pre-wrap">
-              <span className="mr-2 text-gray-600">$</span>
-              {log}
-            </div>
-          ))
-        )}
-        <div ref={endRef} />
-      </Box>
-    </Box>
+    <div className="bg-gray-900 text-green-400 font-mono p-4 rounded-lg h-96 overflow-y-auto shadow-inner border border-gray-700">
+      {logs.length === 0 && (
+        <div className="text-gray-500 italic text-center mt-4">
+          Waiting for connection...
+        </div>
+      )}
+      {logs.map((log, index) => (
+        <div key={index} className="mb-1 break-words text-sm">
+          <span className="text-gray-500 mr-2">
+            [{new Date(log.timestamp).toLocaleTimeString()}]
+          </span>
+          <span
+            className={`
+            ${log.type === "error" ? "text-red-500" : ""}
+            ${log.type === "completed" ? "text-blue-400" : ""}
+            ${log.type === "progress" ? "text-yellow-300" : ""}
+          `}
+          >
+            {log.stage && (
+              <span className="font-bold mr-2 uppercase text-xs tracking-wider text-purple-400">
+                [{log.stage}]
+              </span>
+            )}
+            {log.message}
+          </span>
+        </div>
+      ))}
+      <div ref={endRef} />
+    </div>
   );
 };
 
