@@ -11,12 +11,11 @@ import {
   Typography,
   Switch,
   FormControlLabel,
-  Grid,
+  Grid2 as Grid,
   type SelectChangeEvent,
 } from "@mui/material";
 import type { Scenario, PipelineRequest, RoutingConfig } from "../../types/api";
-// Assuming MapPicker will be created in src/components/map/MapPicker.tsx
-// import MapPicker from '../map/MapPicker';
+import MapPicker from "../map/MapPicker"; // Uncommented MapPicker import
 
 interface PipelineConfigProps {
   onStartScan: (request: PipelineRequest) => void;
@@ -66,16 +65,14 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
     setScenario(event.target.value as Scenario);
   };
 
-  // Dummy function for map picking for now - commented out to avoid unused variable warning
-  /*
-  const handleMapPick = (type: 'start' | 'end', lat: number, lon: number) => {
-    if (type === 'start') {
-      setStartPoint({ lat, lon });
-    } else {
-      setEndPoint({ lat, lon });
-    }
+  const handleMapPick = (
+    // Uncommented handleMapPick function
+    start: { lat: number; lon: number } | null,
+    end: { lat: number; lon: number } | null,
+  ) => {
+    setStartPoint(start);
+    setEndPoint(end);
   };
-  */
 
   const isRoutingConfigValid = enableRouting
     ? startPoint && endPoint && city
@@ -213,10 +210,15 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
             </Grid>
           </Grid>
 
-          {/* Placeholder for Mini Map */}
-          <Box className="flex items-center justify-center w-full h-64 text-gray-500 bg-gray-200 rounded-md">
-            Mini Map Placeholder (Click to set points)
-            {/* In next step, this will be replaced by <MapPicker onPointSelect={handleMapPick} /> */}
+          <Box className="flex items-center justify-center w-full h-96 mt-4 rounded-md overflow-hidden border border-gray-300">
+            <MapPicker
+              key={
+                enableRouting ? "routing-map-active" : "routing-map-inactive"
+              } // Key changes when routing is enabled/disabled
+              onPointsChange={handleMapPick}
+              initialStart={startPoint}
+              initialEnd={endPoint}
+            />
           </Box>
         </Box>
       )}
