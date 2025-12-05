@@ -59,6 +59,12 @@ export interface WebSocketMessage {
   // Potentially add more detailed data depending on message type
 }
 
+// GeoJSON Specific Types
+export interface RouteProperties {
+  risk_score?: number;
+  // Add any other properties expected in route GeoJSON features
+}
+
 // Outputs related types
 export interface OutputFile {
   name: string;
