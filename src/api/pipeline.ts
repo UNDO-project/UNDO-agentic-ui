@@ -1,6 +1,6 @@
 // src/api/pipeline.ts
 import api from "./axios";
-import { PipelineRequest, TaskResponse } from "../types/api";
+import type { PipelineRequest, TaskResponse } from "../types/api";
 
 export const startPipeline = async (
   request: PipelineRequest,

@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import PipelineConfig from "./components/form/PipelineConfig";
-import { PipelineRequest, TaskResponse } from "./types/api";
+import type { PipelineRequest, TaskResponse } from "./types/api";
 import { startPipeline } from "./api/pipeline";
 
 function App() {

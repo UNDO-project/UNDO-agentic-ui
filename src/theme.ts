@@ -1,6 +1,6 @@
 // src/theme.ts
 import { createTheme } from "@mui/material/styles";
-import { PaletteMode } from "@mui/material";
+import type { PaletteMode } from "@mui/material";
 
 // Define a basic theme
 const getAppTheme = (mode: PaletteMode) =>
