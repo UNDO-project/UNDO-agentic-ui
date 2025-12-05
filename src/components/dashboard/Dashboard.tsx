@@ -130,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <Container maxWidth="xl" className="py-8">
-      <Box className="mb-6 flex items-center justify-between">
+      <Box className="flex items-center justify-between mb-6">
         <Button
           startIcon={<ArrowBackIcon />}
           onClick={onBackToConfig}
@@ -145,7 +145,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       </Box>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <StatsPanel
             city={city}
             taskResult={taskResult}
@@ -157,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             onDownloadFile={handleDownload}
           />
         </Grid>
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <SurveillanceMap
             enrichedGeoJson={enrichedGeoJson}
             routeGeoJson={routeGeoJson}
