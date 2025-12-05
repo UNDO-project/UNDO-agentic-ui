@@ -38,11 +38,27 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
     null,
   );
 
+  // Helper for coordinate validation
+  const isValidCoordinate = (
+    lat: number | undefined,
+    lon: number | undefined,
+  ): boolean => {
+    if (lat === undefined || lon === undefined) return false;
+    return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+  };
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
 
     let routingConfig: RoutingConfig | undefined;
-    if (enableRouting && startPoint && endPoint && city) {
+    if (
+      enableRouting &&
+      startPoint &&
+      endPoint &&
+      city &&
+      isValidCoordinate(startPoint.lat, startPoint.lon) &&
+      isValidCoordinate(endPoint.lat, endPoint.lon)
+    ) {
       routingConfig = {
         city,
         country: country || undefined,
@@ -74,9 +90,17 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
     setEndPoint(end);
   };
 
+  const isCityValid = city.trim() !== "";
+  const isStartPointValid =
+    startPoint && isValidCoordinate(startPoint.lat, startPoint.lon);
+  const isEndPointValid =
+    endPoint && isValidCoordinate(endPoint.lat, endPoint.lon);
+
   const isRoutingConfigValid = enableRouting
-    ? startPoint && endPoint && city
+    ? isStartPointValid && isEndPointValid
     : true;
+
+  const isFormValid = isCityValid && isRoutingConfigValid;
 
   return (
     <Box
@@ -98,6 +122,8 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
           variant="outlined"
           required
           fullWidth
+          error={!isCityValid && enableRouting}
+          helperText={!isCityValid && enableRouting ? "City is required" : ""}
         />
       </FormControl>
 
@@ -155,12 +181,24 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
                 value={startPoint?.lat ?? ""}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
-                  setStartPoint((prev) => ({ lat: val, lon: prev?.lon ?? 0 }));
+                  setStartPoint((prev) => ({
+                    lat: isNaN(val) ? 0 : val,
+                    lon: prev?.lon ?? 0,
+                  }));
                 }}
                 fullWidth
                 required
-                error={!startPoint?.lat && enableRouting}
-                helperText={!startPoint?.lat && enableRouting ? "Required" : ""}
+                error={
+                  !startPoint ||
+                  !isValidCoordinate(startPoint.lat, startPoint.lon)
+                }
+                helperText={
+                  !startPoint
+                    ? "Required"
+                    : !isValidCoordinate(startPoint.lat, startPoint.lon)
+                      ? "Invalid Latitude (-90 to 90)"
+                      : ""
+                }
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -170,12 +208,24 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
                 value={startPoint?.lon ?? ""}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
-                  setStartPoint((prev) => ({ lat: prev?.lat ?? 0, lon: val }));
+                  setStartPoint((prev) => ({
+                    lat: prev?.lat ?? 0,
+                    lon: isNaN(val) ? 0 : val,
+                  }));
                 }}
                 fullWidth
                 required
-                error={!startPoint?.lon && enableRouting}
-                helperText={!startPoint?.lon && enableRouting ? "Required" : ""}
+                error={
+                  !startPoint ||
+                  !isValidCoordinate(startPoint.lat, startPoint.lon)
+                }
+                helperText={
+                  !startPoint
+                    ? "Required"
+                    : !isValidCoordinate(startPoint.lat, startPoint.lon)
+                      ? "Invalid Longitude (-180 to 180)"
+                      : ""
+                }
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -185,12 +235,23 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
                 value={endPoint?.lat ?? ""}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
-                  setEndPoint((prev) => ({ lat: val, lon: prev?.lon ?? 0 }));
+                  setEndPoint((prev) => ({
+                    lat: isNaN(val) ? 0 : val,
+                    lon: prev?.lon ?? 0,
+                  }));
                 }}
                 fullWidth
                 required
-                error={!endPoint?.lat && enableRouting}
-                helperText={!endPoint?.lat && enableRouting ? "Required" : ""}
+                error={
+                  !endPoint || !isValidCoordinate(endPoint.lat, endPoint.lon)
+                }
+                helperText={
+                  !endPoint
+                    ? "Required"
+                    : !isValidCoordinate(endPoint.lat, endPoint.lon)
+                      ? "Invalid Latitude (-90 to 90)"
+                      : ""
+                }
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -200,12 +261,23 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
                 value={endPoint?.lon ?? ""}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
-                  setEndPoint((prev) => ({ lat: prev?.lat ?? 0, lon: val }));
+                  setEndPoint((prev) => ({
+                    lat: prev?.lat ?? 0,
+                    lon: isNaN(val) ? 0 : val,
+                  }));
                 }}
                 fullWidth
                 required
-                error={!endPoint?.lon && enableRouting}
-                helperText={!endPoint?.lon && enableRouting ? "Required" : ""}
+                error={
+                  !endPoint || !isValidCoordinate(endPoint.lat, endPoint.lon)
+                }
+                helperText={
+                  !endPoint
+                    ? "Required"
+                    : !isValidCoordinate(endPoint.lat, endPoint.lon)
+                      ? "Invalid Longitude (-180 to 180)"
+                      : ""
+                }
               />
             </Grid>
           </Grid>
@@ -229,7 +301,7 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
         color="primary"
         fullWidth
         size="large"
-        disabled={isLoading || !city || !isRoutingConfigValid}
+        disabled={isLoading || !isFormValid}
         className="mt-8"
       >
         {isLoading ? "Starting Scan..." : "Start Surveillance Scan"}
