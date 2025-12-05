@@ -9,8 +9,14 @@ import {
   Button,
   Box,
   Typography,
+  Switch,
+  FormControlLabel,
+  Grid,
+  type SelectChangeEvent,
 } from "@mui/material";
-import { Scenario, PipelineRequest } from "../../types/api";
+import type { Scenario, PipelineRequest, RoutingConfig } from "../../types/api";
+// Assuming MapPicker will be created in src/components/map/MapPicker.tsx
+// import MapPicker from '../map/MapPicker';
 
 interface PipelineConfigProps {
   onStartScan: (request: PipelineRequest) => void;
@@ -24,25 +30,70 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
   const [city, setCity] = useState<string>("");
   const [country, setCountry] = useState<string>("");
   const [scenario, setScenario] = useState<Scenario>("basic");
+  const [enableRouting, setEnableRouting] = useState<boolean>(false);
+  const [startPoint, setStartPoint] = useState<{
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const [endPoint, setEndPoint] = useState<{ lat: number; lon: number } | null>(
+    null,
+  );
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    onStartScan({ city, country: country || undefined, scenario });
+
+    let routingConfig: RoutingConfig | undefined;
+    if (enableRouting && startPoint && endPoint && city) {
+      routingConfig = {
+        city,
+        country: country || undefined,
+        start_lat: startPoint.lat,
+        start_lon: startPoint.lon,
+        end_lat: endPoint.lat,
+        end_lon: endPoint.lon,
+      };
+    }
+
+    onStartScan({
+      city,
+      country: country || undefined,
+      scenario,
+      routing_config: routingConfig,
+    });
   };
+
+  const handleScenarioChange = (event: SelectChangeEvent) => {
+    setScenario(event.target.value as Scenario);
+  };
+
+  // Dummy function for map picking for now - commented out to avoid unused variable warning
+  /*
+  const handleMapPick = (type: 'start' | 'end', lat: number, lon: number) => {
+    if (type === 'start') {
+      setStartPoint({ lat, lon });
+    } else {
+      setEndPoint({ lat, lon });
+    }
+  };
+  */
+
+  const isRoutingConfigValid = enableRouting
+    ? startPoint && endPoint && city
+    : true;
 
   return (
     <Box
       component="form"
       onSubmit={handleSubmit}
-      className="space-y-6 p-6 bg-white shadow-lg rounded-lg"
+      className="max-w-2xl p-6 mx-auto space-y-6 bg-white rounded-lg shadow-lg"
       noValidate
       autoComplete="off"
     >
-      <Typography variant="h5" component="h2" className="text-center">
+      <Typography variant="h5" component="h2" className="mb-6 text-center">
         Configure Surveillance Scan
       </Typography>
 
-      <FormControl fullWidth required>
+      <FormControl fullWidth required margin="normal">
         <TextField
           label="City Name"
           value={city}
@@ -53,7 +104,7 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
         />
       </FormControl>
 
-      <FormControl fullWidth>
+      <FormControl fullWidth margin="normal">
         <TextField
           label="Country Code (e.g., DE, GR)"
           value={country}
@@ -63,14 +114,14 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
         />
       </FormControl>
 
-      <FormControl fullWidth required>
+      <FormControl fullWidth required margin="normal">
         <InputLabel id="scenario-select-label">Scenario</InputLabel>
         <Select
           labelId="scenario-select-label"
           id="scenario-select"
           value={scenario}
           label="Scenario"
-          onChange={(e) => setScenario(e.target.value as Scenario)}
+          onChange={handleScenarioChange}
           fullWidth
         >
           <MenuItem value="basic">Basic</MenuItem>
@@ -81,13 +132,102 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
         </Select>
       </FormControl>
 
+      <FormControlLabel
+        control={
+          <Switch
+            checked={enableRouting}
+            onChange={(e) => setEnableRouting(e.target.checked)}
+            name="enableRouting"
+            color="primary"
+          />
+        }
+        label="Compute Safe Route"
+        className="mt-4"
+      />
+
+      {enableRouting && (
+        <Box className="p-4 mt-4 space-y-4 border rounded-lg">
+          <Typography variant="h6" component="h3">
+            Route Configuration
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                label="Start Latitude"
+                type="number"
+                value={startPoint?.lat ?? ""}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setStartPoint((prev) => ({ lat: val, lon: prev?.lon ?? 0 }));
+                }}
+                fullWidth
+                required
+                error={!startPoint?.lat && enableRouting}
+                helperText={!startPoint?.lat && enableRouting ? "Required" : ""}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                label="Start Longitude"
+                type="number"
+                value={startPoint?.lon ?? ""}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setStartPoint((prev) => ({ lat: prev?.lat ?? 0, lon: val }));
+                }}
+                fullWidth
+                required
+                error={!startPoint?.lon && enableRouting}
+                helperText={!startPoint?.lon && enableRouting ? "Required" : ""}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                label="End Latitude"
+                type="number"
+                value={endPoint?.lat ?? ""}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setEndPoint((prev) => ({ lat: val, lon: prev?.lon ?? 0 }));
+                }}
+                fullWidth
+                required
+                error={!endPoint?.lat && enableRouting}
+                helperText={!endPoint?.lat && enableRouting ? "Required" : ""}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                label="End Longitude"
+                type="number"
+                value={endPoint?.lon ?? ""}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setEndPoint((prev) => ({ lat: prev?.lat ?? 0, lon: val }));
+                }}
+                fullWidth
+                required
+                error={!endPoint?.lon && enableRouting}
+                helperText={!endPoint?.lon && enableRouting ? "Required" : ""}
+              />
+            </Grid>
+          </Grid>
+
+          {/* Placeholder for Mini Map */}
+          <Box className="flex items-center justify-center w-full h-64 text-gray-500 bg-gray-200 rounded-md">
+            Mini Map Placeholder (Click to set points)
+            {/* In next step, this will be replaced by <MapPicker onPointSelect={handleMapPick} /> */}
+          </Box>
+        </Box>
+      )}
+
       <Button
         type="submit"
         variant="contained"
         color="primary"
         fullWidth
         size="large"
-        disabled={isLoading || !city}
+        disabled={isLoading || !city || !isRoutingConfigValid}
         className="mt-8"
       >
         {isLoading ? "Starting Scan..." : "Start Surveillance Scan"}
