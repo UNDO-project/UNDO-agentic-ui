@@ -11,7 +11,7 @@ import {
   Typography,
   Switch,
   FormControlLabel,
-  Grid2 as Grid,
+  Grid,
   type SelectChangeEvent,
 } from "@mui/material";
 import type { Scenario, PipelineRequest, RoutingConfig } from "../../types/api";
@@ -210,7 +210,7 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
             </Grid>
           </Grid>
 
-          <Box className="flex items-center justify-center w-full h-96 mt-4 rounded-md overflow-hidden border border-gray-300">
+          <Box className="flex items-center justify-center w-full mt-4 overflow-hidden border border-gray-300 rounded-md h-96">
             <MapPicker
               key={
                 enableRouting ? "routing-map-active" : "routing-map-inactive"
