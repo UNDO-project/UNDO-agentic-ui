@@ -18,12 +18,14 @@ import type { WebSocketMessage } from "../../types/api";
 
 interface ProgressMonitorProps {
   taskId: string;
+  city: string; // Added city prop
   onComplete: () => void;
   onBack: () => void;
 }
 
 const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
   taskId,
+  city, // Destructure city prop
   onComplete,
   onBack,
 }) => {
@@ -113,7 +115,7 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
 
       <Paper className="p-6 mb-6">
         <Typography variant="h5" className="mb-4 font-semibold">
-          Scan Progress
+          Scan Progress for {city}
         </Typography>
 
         <PipelineStepper currentStage={currentStage} />
