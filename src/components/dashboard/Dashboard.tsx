@@ -2,18 +2,18 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
-  CircularProgress,
-  Alert,
   Typography,
   Grid,
   Container,
   Button,
+  Skeleton,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SurveillanceMap from "../map/SurveillanceMap";
 import StatsPanel from "./StatsPanel";
 import { getCityOutputs, getGeoJson, downloadFile } from "../../api/outputs";
 import { getPipelineStatus } from "../../api/pipeline";
+import { useSnackbar } from "../../hooks/useSnackbar";
 import type { TaskResult, OutputFile } from "../../types/api";
 import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import type { RouteProperties } from "../../types/api";
@@ -40,14 +40,14 @@ const Dashboard: React.FC<DashboardProps> = ({
     RouteProperties
   > | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const { showSnackbar } = useSnackbar();
 
   const [showEnrichedLayer, setShowEnrichedLayer] = useState(true);
   const [showRouteLayer, setShowRouteLayer] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       // Fetch task result for stats
       const taskResponse = await getPipelineStatus(taskId);
@@ -66,21 +66,17 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       // Fetch route GeoJSON if routing was enabled and successful
       if (taskResponse.result?.routing?.success) {
-        // Assuming getGeoJson(city, false) gets the route, or use a specific endpoint
-        // For now, let's assume getGeoJson(city, false) is configured to return route GeoJSON.
-        // If the backend has a separate endpoint for route, it should be used.
-        // For simplicity and based on api/outputs.ts, trying `getGeoJson(city, false)`
         const routeBlob = await getGeoJson(city, false);
         const routeText = await routeBlob.text();
         setRouteGeoJson(JSON.parse(routeText));
       }
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
-      setError("Failed to load dashboard data.");
+      showSnackbar("Failed to load dashboard data. Please try again.", "error");
     } finally {
       setLoading(false);
     }
-  }, [taskId, city]);
+  }, [taskId, city, showSnackbar]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -98,32 +94,43 @@ const Dashboard: React.FC<DashboardProps> = ({
         link.click();
         link.parentNode?.removeChild(link);
         window.URL.revokeObjectURL(url);
+        showSnackbar(`Downloaded ${fileName}`, "success");
       } catch (err) {
         console.error("Failed to download file:", err);
-        alert("Failed to download file.");
+        showSnackbar("Failed to download file.", "error");
       }
     },
-    [],
+    [showSnackbar],
   );
 
   if (loading) {
     return (
-      <Container maxWidth="lg" className="py-8 text-center">
-        <CircularProgress className="mb-4" />
-        <Typography>Loading dashboard data...</Typography>
-      </Container>
-    );
-  }
-
-  if (error) {
-    return (
-      <Container maxWidth="lg" className="py-8">
-        <Alert severity="error" className="mb-4">
-          {error}
-        </Alert>
-        <Button onClick={onBackToConfig} startIcon={<ArrowBackIcon />}>
-          Back to Configuration
-        </Button>
+      <Container maxWidth="xl" className="py-8">
+        <Box className="flex items-center justify-between mb-6">
+          <Skeleton
+            variant="rectangular"
+            width={150}
+            height={40}
+            className="rounded"
+          />
+          <Skeleton variant="text" width={400} height={50} />
+        </Box>
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Skeleton
+              variant="rectangular"
+              height={600}
+              className="rounded-lg"
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Skeleton
+              variant="rectangular"
+              height={600}
+              className="rounded-lg"
+            />
+          </Grid>
+        </Grid>
       </Container>
     );
   }
