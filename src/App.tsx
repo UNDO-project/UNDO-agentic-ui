@@ -51,9 +51,9 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline /> {/* Normalize CSS and apply theme background */}
-      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-100">
         {error && (
-          <div className="absolute top-4 right-4 bg-red-500 text-white p-3 rounded shadow-md z-50">
+          <div className="absolute z-50 p-3 text-white bg-red-500 rounded shadow-md top-4 right-4">
             {error}
           </div>
         )}

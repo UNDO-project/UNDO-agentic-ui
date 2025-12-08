@@ -28,6 +28,7 @@
     "@fontsource/roboto": "^5.2.9",
     "@mui/icons-material": "^7.3.6",
     "@mui/material": "^7.3.6",
+    "@tailwindcss/postcss": "^4.1.17",
     "axios": "^1.13.2",
     "leaflet": "^1.9.4",
     "react": "^19.2.0",
