@@ -33,6 +33,7 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [routingEnabled, setRoutingEnabled] = useState<boolean>(true);
 
   const { showSnackbar } = useSnackbar();
 
@@ -52,18 +53,28 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
             setProgress(status.progress);
           }
 
-          // Update stage from metadata or message
-          if (status.message) {
-            setCurrentStage(status.message);
+          // Update stage from metadata.last_message (where backend puts it)
+          const stageMessage = status.metadata?.last_message || status.message;
+          if (stageMessage) {
+            setCurrentStage(stageMessage);
+          }
+
+          // Check if routing is enabled (if metadata provides this info)
+          if (status.metadata?.routing_enabled !== undefined) {
+            setRoutingEnabled(status.metadata.routing_enabled);
+          }
+          // Fallback: check if result has routing data
+          if (status.result?.routing !== undefined) {
+            setRoutingEnabled(true);
           }
 
           // Check for completion
           if (status.status === "completed") {
             setIsComplete(true);
             setProgress(100);
-            setCurrentStage("Completion");
+            setCurrentStage("Completed");
           } else if (status.status === "failed") {
-            setError(status.message || "Task failed");
+            setError(status.error || status.message || "Task failed");
           } else if (status.status === "cancelled") {
             setError("Task cancelled");
           }
@@ -150,7 +161,10 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
           Scan Progress for {city}
         </Typography>
 
-        <PipelineStepper currentStage={currentStage} />
+        <PipelineStepper
+          currentStage={currentStage}
+          routingEnabled={routingEnabled}
+        />
 
         <Box className="mb-2 flex justify-between text-sm text-gray-600">
           <span>Progress</span>
