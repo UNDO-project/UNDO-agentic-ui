@@ -1,5 +1,5 @@
 // src/components/monitor/ProgressMonitor.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -11,10 +11,8 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import useWebSocket, { WebSocketReadyState } from "../../hooks/useWebSocket";
-import Terminal from "./Terminal";
+import { getPipelineStatus } from "../../api/pipeline";
 import PipelineStepper from "./PipelineStepper";
-import type { WebSocketMessage } from "../../types/api";
 
 interface ProgressMonitorProps {
   taskId: string;
@@ -29,57 +27,60 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
   onComplete,
   onBack,
 }) => {
-  const [logs, setLogs] = useState<WebSocketMessage[]>([]);
   const [currentStage, setCurrentStage] = useState<string>("Initialization");
   const [progress, setProgress] = useState<number>(0);
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle incoming WebSocket messages
-  const handleMessage = useCallback((message: WebSocketMessage) => {
-    // Add to logs
-    setLogs((prev) => [...prev, message]);
-
-    // Update stage
-    if (message.stage) {
-      setCurrentStage(message.stage);
-    }
-
-    // Update progress
-    if (typeof message.progress === "number") {
-      setProgress(message.progress);
-    }
-
-    // Check for completion or error
-    if (message.type === "completed") {
-      setIsComplete(true);
-      setProgress(100);
-      setCurrentStage("Completion");
-    } else if (message.type === "error") {
-      setError(message.message);
-    }
-  }, []);
-
-  // Construct WebSocket URL.
-  // Hardcoding localhost:8080 for dev as per plan context.
-  const wsUrl = `ws://localhost:8080/ws/tasks/${taskId}`;
-
-  const { readyState, error: wsError } = useWebSocket(wsUrl, {
-    onMessage: handleMessage,
-  });
-
+  // Polling-based status updates
   useEffect(() => {
-    if (wsError) {
-      console.error("WebSocket error:", wsError);
-    }
-  }, [wsError]);
+    let intervalId: ReturnType<typeof setInterval>;
 
-  const connectionStatus = {
-    [WebSocketReadyState.CONNECTING]: "Connecting...",
-    [WebSocketReadyState.OPEN]: "Connected",
-    [WebSocketReadyState.CLOSING]: "Closing...",
-    [WebSocketReadyState.CLOSED]: "Disconnected",
-  }[readyState];
+    // Poll if task is running
+    if (!isComplete && !error) {
+      // Initial poll
+      const pollStatus = async () => {
+        try {
+          const status = await getPipelineStatus(taskId);
+
+          // Update progress
+          if (status.progress !== undefined) {
+            setProgress(status.progress);
+          }
+
+          // Update stage from metadata or message
+          if (status.message) {
+            setCurrentStage(status.message);
+          }
+
+          // Check for completion
+          if (status.status === "completed") {
+            setIsComplete(true);
+            setProgress(100);
+            setCurrentStage("Completion");
+          } else if (status.status === "failed") {
+            setError(status.message || "Task failed");
+          } else if (status.status === "cancelled") {
+            setError("Task cancelled");
+          }
+        } catch (err) {
+          console.error("Polling failed:", err);
+        }
+      };
+
+      // Poll immediately
+      pollStatus();
+
+      // Then poll every 1.5 seconds
+      intervalId = setInterval(pollStatus, 1500);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isComplete, error, taskId]);
+
+  const connectionStatus = "Polling (every 1.5s)";
 
   return (
     <Container maxWidth="lg" className="py-8">
@@ -100,14 +101,7 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
           >
             Task ID: {taskId}
           </Typography>
-          <Typography
-            variant="caption"
-            className={`${
-              readyState === WebSocketReadyState.OPEN
-                ? "text-green-600"
-                : "text-orange-500"
-            }`}
-          >
+          <Typography variant="caption" className="text-blue-500">
             ● {connectionStatus}
           </Typography>
         </Box>
@@ -152,8 +146,6 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
           </Alert>
         )}
       </Paper>
-
-      <Terminal logs={logs} />
     </Container>
   );
 };
