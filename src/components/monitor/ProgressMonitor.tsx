@@ -11,7 +11,8 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import { getPipelineStatus } from "../../api/pipeline";
+import { getPipelineStatus, cancelPipeline } from "../../api/pipeline";
+import { useSnackbar } from "../../hooks/useSnackbar";
 import PipelineStepper from "./PipelineStepper";
 
 interface ProgressMonitorProps {
@@ -31,6 +32,9 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
   const [progress, setProgress] = useState<number>(0);
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const { showSnackbar } = useSnackbar();
 
   // Polling-based status updates
   useEffect(() => {
@@ -82,17 +86,51 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
 
   const connectionStatus = "Polling (every 1.5s)";
 
+  const handleCancel = async () => {
+    if (isCancelling) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this scan? This action cannot be undone.",
+    );
+
+    if (!confirmed) return;
+
+    setIsCancelling(true);
+    try {
+      await cancelPipeline(taskId);
+      showSnackbar("Pipeline cancellation requested", "info");
+      setError("Task cancelled by user");
+    } catch (err) {
+      console.error("Failed to cancel pipeline:", err);
+      showSnackbar("Failed to cancel pipeline", "error");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   return (
     <Container maxWidth="lg" className="py-8">
       <Box className="mb-6 flex items-center justify-between">
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={onBack}
-          variant="outlined"
-          color="inherit"
-        >
-          Back to Config
-        </Button>
+        <Box className="flex gap-2">
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={onBack}
+            variant="outlined"
+            color="inherit"
+          >
+            Back to Config
+          </Button>
+          {!isComplete && !error && (
+            <Button
+              onClick={handleCancel}
+              variant="outlined"
+              color="error"
+              disabled={isCancelling}
+            >
+              {isCancelling ? "Cancelling..." : "Cancel Scan"}
+            </Button>
+          )}
+        </Box>
         <Box className="text-right">
           <Typography
             variant="overline"
