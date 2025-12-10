@@ -5,6 +5,10 @@ import type { PipelineRequest, TaskResponse } from "../types/api";
 export const startPipeline = async (
   request: PipelineRequest,
 ): Promise<TaskResponse> => {
+  console.log(
+    "Starting pipeline with request:",
+    JSON.stringify(request, null, 2),
+  );
   const response = await api.post<TaskResponse>("/pipeline/run", request);
   return response.data;
 };

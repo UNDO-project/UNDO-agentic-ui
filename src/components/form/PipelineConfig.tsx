@@ -71,7 +71,7 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
 
     onStartScan({
       city,
-      country: country || undefined,
+      country: country, // Send country as "" if empty, instead of undefined
       scenario,
       routing_config: routingConfig,
     });
