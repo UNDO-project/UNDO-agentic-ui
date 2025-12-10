@@ -35,19 +35,24 @@ export interface TaskResult {
 }
 
 export interface TaskResponse {
-  task_id: string;
+  id?: string; // Backend returns 'id' instead of 'task_id' in status responses
+  task_id?: string; // Used in creation response
+  type?: string; // Backend includes 'type: "pipeline"'
   status: TaskStatus;
-  message?: string;
+  message?: string; // Used in creation response
   progress?: number; // 0-100%
+  error?: string | null;
   created_at: string;
   started_at?: string;
-  completed_at?: string;
+  completed_at?: string | null;
   metadata?: {
     city: string;
+    country?: string | null;
     scenario: Scenario;
-    // Add other metadata fields
+    last_message?: string; // Current stage message from backend
+    routing_enabled?: boolean;
   };
-  result?: TaskResult;
+  result?: TaskResult | null;
 }
 
 export interface WebSocketMessage {
