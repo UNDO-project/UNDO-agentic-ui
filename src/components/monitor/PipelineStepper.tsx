@@ -5,6 +5,7 @@ import {
   Step,
   StepLabel,
   Box,
+  Typography,
   type StepIconProps,
   styled,
 } from "@mui/material";
@@ -22,6 +23,7 @@ const steps = [
 
 interface PipelineStepperProps {
   currentStage: string;
+  routingEnabled?: boolean; // Whether routing is part of this pipeline
 }
 
 // Custom Step Icon to show spinning animation for active step
@@ -67,19 +69,34 @@ function CustomStepIcon(props: StepIconProps) {
   );
 }
 
-const PipelineStepper: React.FC<PipelineStepperProps> = ({ currentStage }) => {
+const PipelineStepper: React.FC<PipelineStepperProps> = ({
+  currentStage,
+  routingEnabled = true,
+}) => {
   // Helper to map backend stage strings to step index
   const getActiveStep = (stage: string) => {
     const normalizedStage = stage.toLowerCase();
     if (normalizedStage.includes("init") || normalizedStage.includes("pend"))
       return 0;
-    if (normalizedStage.includes("scrap")) return 1;
-    if (normalizedStage.includes("analy") || normalizedStage.includes("enrich"))
+    if (
+      normalizedStage.includes("scrap") ||
+      normalizedStage.includes("download")
+    )
+      return 1;
+    if (
+      normalizedStage.includes("analy") ||
+      normalizedStage.includes("enrich") ||
+      normalizedStage.includes("llm")
+    )
       return 2;
     if (normalizedStage.includes("rout") || normalizedStage.includes("path"))
       return 3;
-    if (normalizedStage.includes("complet") || normalizedStage.includes("done"))
-      return 5; // All steps completed
+    if (
+      normalizedStage.includes("complet") ||
+      normalizedStage.includes("done") ||
+      normalizedStage.includes("finished")
+    )
+      return 4; // Completion step
     return 0;
   };
 
@@ -88,11 +105,31 @@ const PipelineStepper: React.FC<PipelineStepperProps> = ({ currentStage }) => {
   return (
     <Box sx={{ width: "100%", mb: 4 }}>
       <Stepper activeStep={activeStep} alternativeLabel>
-        {steps.map((label) => (
-          <Step key={label}>
-            <StepLabel StepIconComponent={CustomStepIcon}>{label}</StepLabel>
-          </Step>
-        ))}
+        {steps.map((label) => {
+          // Skip routing step if not enabled
+          if (label === "Routing" && !routingEnabled) {
+            return (
+              <Step key={label}>
+                <StepLabel
+                  StepIconComponent={CustomStepIcon}
+                  optional={
+                    <Typography variant="caption" color="text.secondary">
+                      Skipped
+                    </Typography>
+                  }
+                >
+                  {label}
+                </StepLabel>
+              </Step>
+            );
+          }
+
+          return (
+            <Step key={label}>
+              <StepLabel StepIconComponent={CustomStepIcon}>{label}</StepLabel>
+            </Step>
+          );
+        })}
       </Stepper>
     </Box>
   );
