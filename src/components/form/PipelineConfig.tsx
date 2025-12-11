@@ -20,11 +20,15 @@ import MapPicker from "../map/MapPicker"; // Uncommented MapPicker import
 interface PipelineConfigProps {
   onStartScan: (request: PipelineRequest) => void;
   isLoading: boolean;
+  onViewLastResults?: () => void;
+  lastResultsCity?: string;
 }
 
 const PipelineConfig: React.FC<PipelineConfigProps> = ({
   onStartScan,
   isLoading,
+  onViewLastResults,
+  lastResultsCity,
 }) => {
   const [city, setCity] = useState<string>("");
   const [country, setCountry] = useState<string>("");
@@ -295,6 +299,19 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
         </Box>
       )}
 
+      {onViewLastResults && lastResultsCity && (
+        <Button
+          variant="outlined"
+          color="secondary"
+          fullWidth
+          size="large"
+          onClick={onViewLastResults}
+          className="mt-4"
+        >
+          View Last Results ({lastResultsCity})
+        </Button>
+      )}
+
       <Button
         type="submit"
         variant="contained"
@@ -302,7 +319,7 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
         fullWidth
         size="large"
         disabled={isLoading || !isFormValid}
-        className="mt-8"
+        className="mt-4"
       >
         {isLoading ? "Starting Scan..." : "Start Surveillance Scan"}
       </Button>
