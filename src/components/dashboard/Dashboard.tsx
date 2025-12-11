@@ -51,9 +51,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [heatmapError, setHeatmapError] = useState(false);
   const [hotspotsUrl, setHotspotsUrl] = useState<string | null>(null);
   const [privacyChartUrl, setPrivacyChartUrl] = useState<string | null>(null);
+  const [privacyChartError, setPrivacyChartError] = useState(false);
   const [sensitivityChartUrl, setSensitivityChartUrl] = useState<string | null>(
     null,
   );
+  const [sensitivityChartError, setSensitivityChartError] = useState(false);
   const [routeUrl, setRouteUrl] = useState<string | null>(null);
 
   const { showSnackbar } = useSnackbar();
@@ -89,9 +91,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       // Set privacy and sensitivity chart URLs
       const privacyChartPath = `/api/v1/outputs/${city}/charts?chart=privacy`;
       setPrivacyChartUrl(privacyChartPath);
+      setPrivacyChartError(false);
 
       const sensitivityChartPath = `/api/v1/outputs/${city}/charts?chart=sensitivity`;
       setSensitivityChartUrl(sensitivityChartPath);
+      setSensitivityChartError(false);
 
       // Set route URL if routing was successful and route_id is available
       if (taskResponse.result?.routing?.route_id) {
@@ -340,7 +344,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               p: 2,
             }}
           >
-            {privacyChartUrl ? (
+            {privacyChartUrl && !privacyChartError ? (
               <img
                 src={privacyChartUrl}
                 alt="Privacy Distribution Chart"
@@ -349,9 +353,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                   maxHeight: "100%",
                   objectFit: "contain",
                 }}
-                onError={(e) => {
+                onError={() => {
                   console.warn("Failed to load privacy chart");
-                  e.currentTarget.style.display = "none";
+                  setPrivacyChartError(true);
                 }}
               />
             ) : (
@@ -384,7 +388,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               p: 2,
             }}
           >
-            {sensitivityChartUrl ? (
+            {sensitivityChartUrl && !sensitivityChartError ? (
               <img
                 src={sensitivityChartUrl}
                 alt="Sensitivity Chart"
@@ -393,9 +397,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                   maxHeight: "100%",
                   objectFit: "contain",
                 }}
-                onError={(e) => {
+                onError={() => {
                   console.warn("Failed to load sensitivity chart");
-                  e.currentTarget.style.display = "none";
+                  setSensitivityChartError(true);
                 }}
               />
             ) : (
