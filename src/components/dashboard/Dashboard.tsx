@@ -15,6 +15,8 @@ import DownloadIcon from "@mui/icons-material/Download";
 import MapIcon from "@mui/icons-material/Map";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import BubbleChartIcon from "@mui/icons-material/BubbleChart";
+import PrivacyTipIcon from "@mui/icons-material/PrivacyTip";
+import SecurityIcon from "@mui/icons-material/Security";
 import SurveillanceMap from "../map/SurveillanceMap";
 import StatsPanel from "./StatsPanel";
 import { getCityOutputs, getGeoJson, downloadFile } from "../../api/outputs";
@@ -41,12 +43,16 @@ const Dashboard: React.FC<DashboardProps> = ({
     GeoJsonProperties
   > | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"map" | "heatmap" | "hotspots">(
-    "map",
-  );
+  const [viewMode, setViewMode] = useState<
+    "map" | "heatmap" | "hotspots" | "privacy" | "sensitivity"
+  >("map");
   const [heatmapUrl, setHeatmapUrl] = useState<string | null>(null);
   const [heatmapError, setHeatmapError] = useState(false);
   const [hotspotsUrl, setHotspotsUrl] = useState<string | null>(null);
+  const [privacyChartUrl, setPrivacyChartUrl] = useState<string | null>(null);
+  const [sensitivityChartUrl, setSensitivityChartUrl] = useState<string | null>(
+    null,
+  );
 
   const { showSnackbar } = useSnackbar();
 
@@ -77,6 +83,13 @@ const Dashboard: React.FC<DashboardProps> = ({
       // Set hotspots PNG URL
       const hotspotsPath = `/api/v1/outputs/${city}/map?map_type=hotspots`;
       setHotspotsUrl(hotspotsPath);
+
+      // Set privacy and sensitivity chart URLs
+      const privacyChartPath = `/api/v1/outputs/${city}/charts?chart=privacy`;
+      setPrivacyChartUrl(privacyChartPath);
+
+      const sensitivityChartPath = `/api/v1/outputs/${city}/charts?chart=sensitivity`;
+      setSensitivityChartUrl(sensitivityChartPath);
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       showSnackbar("Failed to load dashboard data. Please try again.", "error");
@@ -204,6 +217,14 @@ const Dashboard: React.FC<DashboardProps> = ({
             <BubbleChartIcon className="mr-2" />
             Hotspots
           </ToggleButton>
+          <ToggleButton value="privacy" aria-label="privacy distribution view">
+            <PrivacyTipIcon className="mr-2" />
+            Privacy
+          </ToggleButton>
+          <ToggleButton value="sensitivity" aria-label="sensitivity view">
+            <SecurityIcon className="mr-2" />
+            Sensitivity
+          </ToggleButton>
         </ToggleButtonGroup>
       </Box>
 
@@ -249,7 +270,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               </Box>
             )}
           </Box>
-        ) : (
+        ) : viewMode === "hotspots" ? (
           <Box
             sx={{
               width: "100%",
@@ -289,6 +310,94 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </Typography>
                 <Typography variant="body2" color="text.disabled">
                   The hotspots image was not generated for this scan
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        ) : viewMode === "privacy" ? (
+          <Box
+            sx={{
+              width: "100%",
+              height: "700px",
+              bgcolor: "grey.100",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              p: 2,
+            }}
+          >
+            {privacyChartUrl ? (
+              <img
+                src={privacyChartUrl}
+                alt="Privacy Distribution Chart"
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "contain",
+                }}
+                onError={(e) => {
+                  console.warn("Failed to load privacy chart");
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <Typography variant="h6" color="text.secondary">
+                  Privacy chart not available
+                </Typography>
+                <Typography variant="body2" color="text.disabled">
+                  The privacy distribution chart was not generated for this scan
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              width: "100%",
+              height: "700px",
+              bgcolor: "grey.100",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              p: 2,
+            }}
+          >
+            {sensitivityChartUrl ? (
+              <img
+                src={sensitivityChartUrl}
+                alt="Sensitivity Chart"
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "contain",
+                }}
+                onError={(e) => {
+                  console.warn("Failed to load sensitivity chart");
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <Typography variant="h6" color="text.secondary">
+                  Sensitivity chart not available
+                </Typography>
+                <Typography variant="body2" color="text.disabled">
+                  The sensitivity chart was not generated for this scan
                 </Typography>
               </Box>
             )}
