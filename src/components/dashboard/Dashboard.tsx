@@ -3,12 +3,17 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
-  Grid,
   Container,
   Button,
   Skeleton,
+  Paper,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import DownloadIcon from "@mui/icons-material/Download";
+import MapIcon from "@mui/icons-material/Map";
+import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import SurveillanceMap from "../map/SurveillanceMap";
 import StatsPanel from "./StatsPanel";
 import { getCityOutputs, getGeoJson, downloadFile } from "../../api/outputs";
@@ -16,7 +21,6 @@ import { getPipelineStatus } from "../../api/pipeline";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import type { TaskResult, OutputFile } from "../../types/api";
 import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
-import type { RouteProperties } from "../../types/api";
 
 interface DashboardProps {
   taskId: string;
@@ -35,16 +39,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     Geometry,
     GeoJsonProperties
   > | null>(null);
-  const [routeGeoJson, setRouteGeoJson] = useState<FeatureCollection<
-    Geometry,
-    RouteProperties
-  > | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"map" | "heatmap">("map");
+  const [heatmapUrl, setHeatmapUrl] = useState<string | null>(null);
+  const [heatmapError, setHeatmapError] = useState(false);
 
   const { showSnackbar } = useSnackbar();
-
-  const [showEnrichedLayer, setShowEnrichedLayer] = useState(true);
-  const [showRouteLayer, setShowRouteLayer] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -59,17 +59,16 @@ const Dashboard: React.FC<DashboardProps> = ({
       const outputsResponse = await getCityOutputs(city);
       setOutputFiles(outputsResponse.files);
 
-      // Fetch enriched GeoJSON
+      // Fetch enriched GeoJSON for camera markers
       const enrichedBlob = await getGeoJson(city, true);
       const enrichedText = await enrichedBlob.text();
       setEnrichedGeoJson(JSON.parse(enrichedText));
 
-      // Fetch route GeoJSON if routing was enabled and successful
-      if (taskResponse.result?.routing?.success) {
-        const routeBlob = await getGeoJson(city, false);
-        const routeText = await routeBlob.text();
-        setRouteGeoJson(JSON.parse(routeText));
-      }
+      // Set heatmap URL - the /api/v1/outputs/{city}/map endpoint serves the HTML directly
+      // The iframe will handle loading it, and we'll catch errors via onError handler
+      const heatmapPath = `/api/v1/outputs/${city}/map?map_type=heatmap`;
+      setHeatmapUrl(heatmapPath);
+      setHeatmapError(false);
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       showSnackbar("Failed to load dashboard data. Please try again.", "error");
@@ -81,6 +80,24 @@ const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  const handleDownloadGeoJson = useCallback(async () => {
+    try {
+      const geoJsonBlob = await getGeoJson(city, true);
+      const url = window.URL.createObjectURL(geoJsonBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${city}_cameras.geojson`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      showSnackbar(`Downloaded ${city}_cameras.geojson`, "success");
+    } catch (err) {
+      console.error("Failed to download GeoJSON:", err);
+      showSnackbar("Failed to download GeoJSON file.", "error");
+    }
+  }, [city, showSnackbar]);
 
   const handleDownload = useCallback(
     async (filePath: string, fileName: string) => {
@@ -115,22 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           />
           <Skeleton variant="text" width={400} height={50} />
         </Box>
-        <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Skeleton
-              variant="rectangular"
-              height={600}
-              className="rounded-lg"
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 8 }}>
-            <Skeleton
-              variant="rectangular"
-              height={600}
-              className="rounded-lg"
-            />
-          </Grid>
-        </Grid>
+        <Skeleton variant="rectangular" height={700} className="rounded-lg" />
       </Container>
     );
   }
@@ -147,32 +149,98 @@ const Dashboard: React.FC<DashboardProps> = ({
           Back to Config
         </Button>
         <Typography variant="h4" component="h1">
-          Surveillance Dashboard for {city}
+          Surveillance Dashboard - {city}
         </Typography>
+        <Box className="flex gap-2">
+          <Button
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadGeoJson}
+            variant="contained"
+            color="primary"
+          >
+            Download GeoJSON
+          </Button>
+        </Box>
       </Box>
 
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 4 }}>
+      {/* Stats Summary */}
+      {taskResult && (
+        <Box className="mb-4">
           <StatsPanel
-            city={city}
             taskResult={taskResult}
             outputFiles={outputFiles}
-            showEnrichedLayer={showEnrichedLayer}
-            showRouteLayer={showRouteLayer}
-            onToggleEnrichedLayer={setShowEnrichedLayer}
-            onToggleRouteLayer={setShowRouteLayer}
             onDownloadFile={handleDownload}
           />
-        </Grid>
-        <Grid size={{ xs: 12, md: 8 }}>
-          <SurveillanceMap
-            enrichedGeoJson={enrichedGeoJson}
-            routeGeoJson={routeGeoJson}
-            showEnrichedLayer={showEnrichedLayer}
-            showRouteLayer={showRouteLayer}
-          />
-        </Grid>
-      </Grid>
+        </Box>
+      )}
+
+      {/* View Toggle */}
+      <Box className="mb-4 flex justify-center">
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(_, newMode) => {
+            if (newMode !== null) {
+              setViewMode(newMode);
+            }
+          }}
+          aria-label="view mode"
+        >
+          <ToggleButton value="map" aria-label="map view">
+            <MapIcon className="mr-2" />
+            Camera Map
+          </ToggleButton>
+          <ToggleButton value="heatmap" aria-label="heatmap view">
+            <LocalFireDepartmentIcon className="mr-2" />
+            Heatmap
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      {/* Main Visualization */}
+      <Paper className="overflow-hidden" sx={{ p: 0 }}>
+        {viewMode === "map" ? (
+          <SurveillanceMap enrichedGeoJson={enrichedGeoJson} />
+        ) : (
+          <Box sx={{ width: "100%", height: "700px", bgcolor: "grey.100" }}>
+            {heatmapUrl && !heatmapError ? (
+              <iframe
+                src={heatmapUrl}
+                title="Surveillance Heatmap"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                }}
+                onError={() => {
+                  console.warn("Failed to load heatmap iframe");
+                  setHeatmapError(true);
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
+                <Typography variant="h6" color="text.secondary">
+                  Heatmap not available
+                </Typography>
+                <Typography variant="body2" color="text.disabled">
+                  {heatmapError
+                    ? "The heatmap file was not generated for this scan"
+                    : "Loading heatmap..."}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+      </Paper>
     </Container>
   );
 };
