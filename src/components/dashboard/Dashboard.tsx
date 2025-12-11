@@ -100,7 +100,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       link.click();
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
-      showSnackbar(`Downloaded ${city}_cameras.geojson`, "success");
     } catch (err) {
       console.error("Failed to download GeoJSON:", err);
       showSnackbar("Failed to download GeoJSON file.", "error");
@@ -119,7 +118,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         link.click();
         link.parentNode?.removeChild(link);
         window.URL.revokeObjectURL(url);
-        showSnackbar(`Downloaded ${fileName}`, "success");
       } catch (err) {
         console.error("Failed to download file:", err);
         showSnackbar("Failed to download file.", "error");
