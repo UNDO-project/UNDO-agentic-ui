@@ -14,6 +14,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DownloadIcon from "@mui/icons-material/Download";
 import MapIcon from "@mui/icons-material/Map";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
+import BubbleChartIcon from "@mui/icons-material/BubbleChart";
 import SurveillanceMap from "../map/SurveillanceMap";
 import StatsPanel from "./StatsPanel";
 import { getCityOutputs, getGeoJson, downloadFile } from "../../api/outputs";
@@ -40,9 +41,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     GeoJsonProperties
   > | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"map" | "heatmap">("map");
+  const [viewMode, setViewMode] = useState<"map" | "heatmap" | "hotspots">(
+    "map",
+  );
   const [heatmapUrl, setHeatmapUrl] = useState<string | null>(null);
   const [heatmapError, setHeatmapError] = useState(false);
+  const [hotspotsUrl, setHotspotsUrl] = useState<string | null>(null);
 
   const { showSnackbar } = useSnackbar();
 
@@ -69,6 +73,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       const heatmapPath = `/api/v1/outputs/${city}/map?map_type=heatmap`;
       setHeatmapUrl(heatmapPath);
       setHeatmapError(false);
+
+      // Set hotspots PNG URL
+      const hotspotsPath = `/api/v1/outputs/${city}/map?map_type=hotspots`;
+      setHotspotsUrl(hotspotsPath);
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       showSnackbar("Failed to load dashboard data. Please try again.", "error");
@@ -194,6 +202,10 @@ const Dashboard: React.FC<DashboardProps> = ({
             <LocalFireDepartmentIcon className="mr-2" />
             Heatmap
           </ToggleButton>
+          <ToggleButton value="hotspots" aria-label="hotspots view">
+            <BubbleChartIcon className="mr-2" />
+            Hotspots
+          </ToggleButton>
         </ToggleButtonGroup>
       </Box>
 
@@ -201,7 +213,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       <Paper className="overflow-hidden" sx={{ p: 0 }}>
         {viewMode === "map" ? (
           <SurveillanceMap enrichedGeoJson={enrichedGeoJson} />
-        ) : (
+        ) : viewMode === "heatmap" ? (
           <Box sx={{ width: "100%", height: "700px", bgcolor: "grey.100" }}>
             {heatmapUrl && !heatmapError ? (
               <iframe
@@ -235,6 +247,50 @@ const Dashboard: React.FC<DashboardProps> = ({
                   {heatmapError
                     ? "The heatmap file was not generated for this scan"
                     : "Loading heatmap..."}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              width: "100%",
+              height: "700px",
+              bgcolor: "grey.100",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              p: 2,
+            }}
+          >
+            {hotspotsUrl ? (
+              <img
+                src={hotspotsUrl}
+                alt="Surveillance Hotspots"
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "contain",
+                }}
+                onError={(e) => {
+                  console.warn("Failed to load hotspots image");
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <Typography variant="h6" color="text.secondary">
+                  Hotspots not available
+                </Typography>
+                <Typography variant="body2" color="text.disabled">
+                  The hotspots image was not generated for this scan
                 </Typography>
               </Box>
             )}
