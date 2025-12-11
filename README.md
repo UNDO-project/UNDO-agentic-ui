@@ -1,10 +1,14 @@
 # Agentic Surveillance Research Frontend
 
-## Overview (Non-Technical)
+## Overview
 
 Welcome to the **Agentic Surveillance Research Frontend**. This application acts as a specialized navigation tool designed to help understand and visualize surveillance levels in a city.
 
-Think of it like a standard map application, but instead of just showing you the fastest way to get somewhere, it helps identify **"safe routes"**—paths that minimize exposure to public surveillance cameras.
+- Download data for surveillance cameras in a city.
+- See a map with all cameras
+- See the density of cameras through a heatmat
+- Check out charts about the operation of the cameras
+- See a walkable **less "surveilled route"** between a start and a destination
 
 **Key Features:**
 

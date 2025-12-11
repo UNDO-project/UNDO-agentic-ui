@@ -9,9 +9,15 @@ export const getCityOutputs = async (
   return response.data;
 };
 
-// Generic function to download any file by its path
-export const downloadFile = async (filePath: string): Promise<Blob> => {
-  const response = await api.get(filePath, { responseType: "blob" });
+// Generic function to download any file by filename and city
+export const downloadFile = async (
+  filename: string,
+  city: string,
+): Promise<Blob> => {
+  const response = await api.get(`/outputs/file/${filename}`, {
+    params: { city },
+    responseType: "blob",
+  });
   return response.data;
 };
 
