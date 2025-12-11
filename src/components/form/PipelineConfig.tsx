@@ -111,7 +111,7 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
       autoComplete="off"
     >
       <Typography variant="h5" component="h2" className="mb-6 text-center">
-        Configure Surveillance Scan
+        Configure Surveillance Pipeline
       </Typography>
 
       <FormControl fullWidth required margin="normal">

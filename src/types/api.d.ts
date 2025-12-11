@@ -30,7 +30,12 @@ export interface TaskResult {
   status: TaskStatus;
   scrape: { success: boolean; elements_count?: number };
   analyze: { success: boolean; element_count?: number };
-  routing?: { success: boolean; length_m: number; exposure_score: number };
+  routing?: {
+    success: boolean;
+    length_m: number;
+    exposure_score: number;
+    route_id?: string;
+  };
   // Add other result fields as they become relevant
 }
 

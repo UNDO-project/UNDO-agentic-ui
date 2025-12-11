@@ -17,6 +17,7 @@ import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import BubbleChartIcon from "@mui/icons-material/BubbleChart";
 import PrivacyTipIcon from "@mui/icons-material/PrivacyTip";
 import SecurityIcon from "@mui/icons-material/Security";
+import RouteIcon from "@mui/icons-material/Route";
 import SurveillanceMap from "../map/SurveillanceMap";
 import StatsPanel from "./StatsPanel";
 import { getCityOutputs, getGeoJson, downloadFile } from "../../api/outputs";
@@ -44,7 +45,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   > | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<
-    "map" | "heatmap" | "hotspots" | "privacy" | "sensitivity"
+    "map" | "heatmap" | "hotspots" | "privacy" | "sensitivity" | "route"
   >("map");
   const [heatmapUrl, setHeatmapUrl] = useState<string | null>(null);
   const [heatmapError, setHeatmapError] = useState(false);
@@ -53,6 +54,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [sensitivityChartUrl, setSensitivityChartUrl] = useState<string | null>(
     null,
   );
+  const [routeUrl, setRouteUrl] = useState<string | null>(null);
 
   const { showSnackbar } = useSnackbar();
 
@@ -90,6 +92,12 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       const sensitivityChartPath = `/api/v1/outputs/${city}/charts?chart=sensitivity`;
       setSensitivityChartUrl(sensitivityChartPath);
+
+      // Set route URL if routing was successful and route_id is available
+      if (taskResponse.result?.routing?.route_id) {
+        const routePath = `/api/v1/outputs/${city}/route/${taskResponse.result.routing.route_id}?filetype=map`;
+        setRouteUrl(routePath);
+      }
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       showSnackbar("Failed to load dashboard data. Please try again.", "error");
@@ -168,7 +176,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           Back to Config
         </Button>
         <Typography variant="h4" component="h1">
-          Surveillance Dashboard - {city}
+          Surveillance Research Panel - {city}
         </Typography>
         <Box className="flex gap-2">
           <Button
@@ -194,7 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {/* View Toggle */}
-      <Box className="mb-4 flex justify-center">
+      <Box className="flex justify-center mb-4">
         <ToggleButtonGroup
           value={viewMode}
           exclusive
@@ -225,6 +233,12 @@ const Dashboard: React.FC<DashboardProps> = ({
             <SecurityIcon className="mr-2" />
             Sensitivity
           </ToggleButton>
+          {routeUrl && (
+            <ToggleButton value="route" aria-label="route view">
+              <RouteIcon className="mr-2" />
+              Route
+            </ToggleButton>
+          )}
         </ToggleButtonGroup>
       </Box>
 
@@ -358,7 +372,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               </Box>
             )}
           </Box>
-        ) : (
+        ) : viewMode === "sensitivity" ? (
           <Box
             sx={{
               width: "100%",
@@ -402,7 +416,42 @@ const Dashboard: React.FC<DashboardProps> = ({
               </Box>
             )}
           </Box>
-        )}
+        ) : viewMode === "route" ? (
+          <Box sx={{ width: "100%", height: "700px", bgcolor: "grey.100" }}>
+            {routeUrl ? (
+              <iframe
+                src={routeUrl}
+                title="Privacy-Preserving Route"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                }}
+                onError={() => {
+                  console.warn("Failed to load route iframe");
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
+                <Typography variant="h6" color="text.secondary">
+                  Route not available
+                </Typography>
+                <Typography variant="body2" color="text.disabled">
+                  No route was computed for this scan
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        ) : null}
       </Paper>
     </Container>
   );
