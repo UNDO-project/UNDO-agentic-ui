@@ -120,9 +120,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [city, showSnackbar]);
 
   const handleDownload = useCallback(
-    async (filePath: string, fileName: string) => {
+    async (fileName: string) => {
       try {
-        const fileBlob = await downloadFile(filePath);
+        const fileBlob = await downloadFile(fileName, city);
         const url = window.URL.createObjectURL(new Blob([fileBlob]));
         const link = document.createElement("a");
         link.href = url;
@@ -136,7 +136,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         showSnackbar("Failed to download file.", "error");
       }
     },
-    [showSnackbar],
+    [city, showSnackbar],
   );
 
   if (loading) {

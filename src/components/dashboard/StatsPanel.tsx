@@ -10,7 +10,7 @@ import type { TaskResult, OutputFile } from "../../types/api";
 interface StatsPanelProps {
   taskResult: TaskResult | null;
   outputFiles: OutputFile[];
-  onDownloadFile: (filePath: string, fileName: string) => void;
+  onDownloadFile: (fileName: string) => void;
 }
 
 const StatsPanel: React.FC<StatsPanelProps> = ({
@@ -117,17 +117,23 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
               Additional Downloads:
             </Typography>
             <Box className="flex flex-wrap gap-2">
-              {outputFiles.slice(0, 3).map((file) => (
-                <Button
-                  key={file.path}
-                  size="small"
-                  variant="outlined"
-                  startIcon={<FileDownloadIcon />}
-                  onClick={() => onDownloadFile(file.path, file.name)}
-                >
-                  {file.name.replace(`${taskResult?.city}_`, "").split(".")[0]}
-                </Button>
-              ))}
+              {outputFiles.slice(0, 3).map((file) => {
+                const fileExt = file.name.split(".").pop() || "";
+                const baseName = file.name
+                  .replace(`${taskResult?.city}_`, "")
+                  .replace(`.${fileExt}`, "");
+                return (
+                  <Button
+                    key={file.name}
+                    size="small"
+                    variant="outlined"
+                    startIcon={<FileDownloadIcon />}
+                    onClick={() => onDownloadFile(file.name)}
+                  >
+                    {baseName} (.{fileExt})
+                  </Button>
+                );
+              })}
             </Box>
           </Grid>
         )}
