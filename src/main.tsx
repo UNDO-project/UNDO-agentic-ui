@@ -1,22 +1,21 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { RouterProvider } from "react-router-dom";
 import "./index.css";
-import App from "./App.tsx";
+import router from "./router";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
-import getAppTheme from "./theme"; // Our custom theme
+import getAppTheme from "./theme";
 import { SnackbarProvider } from "./contexts/SnackbarContext";
 
-// For now, let's use a dark theme as per the "hacker" feel mentioned in GEMINI.md
 const theme = getAppTheme("dark");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider theme={theme}>
-      <CssBaseline />{" "}
-      {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
+      <CssBaseline />
       <SnackbarProvider>
-        <App />
+        <RouterProvider router={router} />
       </SnackbarProvider>
     </ThemeProvider>
   </StrictMode>,
