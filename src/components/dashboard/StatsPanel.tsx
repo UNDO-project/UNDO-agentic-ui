@@ -20,7 +20,7 @@ interface StatsPanelProps {
   showRouteLayer: boolean;
   onToggleEnrichedLayer: (checked: boolean) => void;
   onToggleRouteLayer: (checked: boolean) => void;
-  onDownloadFile: (filePath: string, fileName: string) => void;
+  onDownloadFile: (fileName: string) => void;
 }
 
 const StatsPanel: React.FC<StatsPanelProps> = ({
@@ -39,8 +39,8 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
     ? `${(taskResult.routing.length_m / 1000).toFixed(2)} km`
     : "N/A";
 
-  const handleDownloadClick = (filePath: string, fileName: string) => {
-    onDownloadFile(filePath, fileName);
+  const handleDownloadClick = (fileName: string) => {
+    onDownloadFile(fileName);
   };
 
   return (
@@ -125,7 +125,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
                 variant="outlined"
                 fullWidth
                 startIcon={<FileDownloadIcon />}
-                onClick={() => handleDownloadClick(file.path, file.name)}
+                onClick={() => handleDownloadClick(file.name)}
                 className="justify-start"
               >
                 {file.name}
