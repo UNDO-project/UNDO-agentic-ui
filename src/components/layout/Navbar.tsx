@@ -48,7 +48,7 @@ function Navbar() {
                 fontWeight: location.pathname === item.path ? 600 : 400,
                 "&:hover": {
                   color: "primary.main",
-                  bgcolor: "rgba(25, 118, 210, 0.08)",
+                  bgcolor: "rgba(0, 255, 0, 0.08)",
                 },
               }}
             >
