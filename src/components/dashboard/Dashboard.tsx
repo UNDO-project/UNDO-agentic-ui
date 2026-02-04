@@ -7,11 +7,25 @@ import {
   Container,
   Button,
   Skeleton,
+  Tabs,
+  Tab,
+  Paper,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import MapIcon from "@mui/icons-material/Map";
+import WhatshotIcon from "@mui/icons-material/Whatshot";
+import BubbleChartIcon from "@mui/icons-material/BubbleChart";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import SurveillanceMap from "../map/SurveillanceMap";
 import StatsPanel from "./StatsPanel";
-import { getCityOutputs, getGeoJson, downloadFile } from "../../api/outputs";
+import {
+  getCityOutputs,
+  getGeoJson,
+  downloadFile,
+  getChart,
+  getHeatmapUrl,
+  getHotspotsPlot,
+} from "../../api/outputs";
 import { getPipelineStatus } from "../../api/pipeline";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import type { TaskResult, OutputFile } from "../../types/api";
@@ -20,8 +34,29 @@ import type { RouteProperties } from "../../types/api";
 
 interface DashboardProps {
   taskId: string;
-  city: string; // The city for which to display results
+  city: string;
   onBackToConfig: () => void;
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`dashboard-tabpanel-${index}`}
+      aria-labelledby={`dashboard-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
+    </div>
+  );
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -40,6 +75,20 @@ const Dashboard: React.FC<DashboardProps> = ({
     RouteProperties
   > | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Chart image URLs
+  const [privacyChartUrl, setPrivacyChartUrl] = useState<string | null>(null);
+  const [sensitivityChartUrl, setSensitivityChartUrl] = useState<string | null>(
+    null,
+  );
+  const [chartsLoading, setChartsLoading] = useState(false);
+  const [chartsError, setChartsError] = useState<string | null>(null);
+
+  // Hotspots image
+  const [hotspotsUrl, setHotspotsUrl] = useState<string | null>(null);
+  const [hotspotsLoading, setHotspotsLoading] = useState(false);
+  const [hotspotsError, setHotspotsError] = useState<string | null>(null);
 
   const { showSnackbar } = useSnackbar();
 
@@ -78,9 +127,88 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   }, [taskId, city, showSnackbar]);
 
+  // Fetch hotspots plot when Hotspots tab is selected
+  const fetchHotspots = useCallback(async () => {
+    if (hotspotsUrl) return; // Already loaded
+
+    setHotspotsLoading(true);
+    setHotspotsError(null);
+
+    try {
+      const blob = await getHotspotsPlot(city);
+      const url = URL.createObjectURL(blob);
+      setHotspotsUrl(url);
+    } catch (err) {
+      console.error("Failed to fetch hotspots plot:", err);
+      setHotspotsError("Hotspots plot not available for this analysis.");
+    } finally {
+      setHotspotsLoading(false);
+    }
+  }, [city, hotspotsUrl]);
+
+  // Fetch charts when Statistics tab is selected
+  const fetchCharts = useCallback(async () => {
+    if (privacyChartUrl && sensitivityChartUrl) return; // Already loaded
+
+    setChartsLoading(true);
+    setChartsError(null);
+
+    try {
+      const [privacyBlob, sensitivityBlob] = await Promise.allSettled([
+        getChart(city, "privacy"),
+        getChart(city, "sensitivity"),
+      ]);
+
+      if (privacyBlob.status === "fulfilled") {
+        const url = URL.createObjectURL(privacyBlob.value);
+        setPrivacyChartUrl(url);
+      }
+
+      if (sensitivityBlob.status === "fulfilled") {
+        const url = URL.createObjectURL(sensitivityBlob.value);
+        setSensitivityChartUrl(url);
+      }
+
+      if (
+        privacyBlob.status === "rejected" &&
+        sensitivityBlob.status === "rejected"
+      ) {
+        setChartsError("Charts not available for this analysis.");
+      }
+    } catch (err) {
+      console.error("Failed to fetch charts:", err);
+      setChartsError("Failed to load charts.");
+    } finally {
+      setChartsLoading(false);
+    }
+  }, [city, privacyChartUrl, sensitivityChartUrl]);
+
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  // Load hotspots when tab 2 (Hotspots) is selected
+  useEffect(() => {
+    if (activeTab === 2) {
+      fetchHotspots();
+    }
+  }, [activeTab, fetchHotspots]);
+
+  // Load charts when tab 3 (Statistics) is selected
+  useEffect(() => {
+    if (activeTab === 3) {
+      fetchCharts();
+    }
+  }, [activeTab, fetchCharts]);
+
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (hotspotsUrl) URL.revokeObjectURL(hotspotsUrl);
+      if (privacyChartUrl) URL.revokeObjectURL(privacyChartUrl);
+      if (sensitivityChartUrl) URL.revokeObjectURL(sensitivityChartUrl);
+    };
+  }, [hotspotsUrl, privacyChartUrl, sensitivityChartUrl]);
 
   const handleDownload = useCallback(
     async (fileName: string) => {
@@ -102,6 +230,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     },
     [showSnackbar, city],
   );
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
 
   if (loading) {
     return (
@@ -165,12 +297,219 @@ const Dashboard: React.FC<DashboardProps> = ({
           />
         </Grid>
         <Grid size={{ xs: 12, md: 8 }}>
-          <SurveillanceMap
-            enrichedGeoJson={enrichedGeoJson}
-            routeGeoJson={routeGeoJson}
-            showEnrichedLayer={showEnrichedLayer}
-            showRouteLayer={showRouteLayer}
-          />
+          <Paper sx={{ bgcolor: "background.paper" }}>
+            <Tabs
+              value={activeTab}
+              onChange={handleTabChange}
+              aria-label="dashboard visualization tabs"
+              variant="fullWidth"
+              sx={{
+                borderBottom: 1,
+                borderColor: "divider",
+                "& .MuiTab-root": {
+                  minHeight: 56,
+                },
+              }}
+            >
+              <Tab
+                icon={<MapIcon />}
+                label="Camera Map"
+                id="dashboard-tab-0"
+                aria-controls="dashboard-tabpanel-0"
+              />
+              <Tab
+                icon={<WhatshotIcon />}
+                label="Heatmap"
+                id="dashboard-tab-1"
+                aria-controls="dashboard-tabpanel-1"
+              />
+              <Tab
+                icon={<BubbleChartIcon />}
+                label="Hotspots"
+                id="dashboard-tab-2"
+                aria-controls="dashboard-tabpanel-2"
+              />
+              <Tab
+                icon={<BarChartIcon />}
+                label="Statistics"
+                id="dashboard-tab-3"
+                aria-controls="dashboard-tabpanel-3"
+              />
+            </Tabs>
+
+            {/* Camera Map Tab */}
+            <TabPanel value={activeTab} index={0}>
+              <SurveillanceMap
+                enrichedGeoJson={enrichedGeoJson}
+                routeGeoJson={routeGeoJson}
+                showEnrichedLayer={showEnrichedLayer}
+                showRouteLayer={showRouteLayer}
+              />
+            </TabPanel>
+
+            {/* Heatmap Tab */}
+            <TabPanel value={activeTab} index={1}>
+              <Box
+                sx={{
+                  height: 600,
+                  width: "100%",
+                  bgcolor: "background.default",
+                }}
+              >
+                <iframe
+                  src={getHeatmapUrl(city)}
+                  title="Surveillance Heatmap"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                  }}
+                />
+              </Box>
+            </TabPanel>
+
+            {/* Hotspots Tab */}
+            <TabPanel value={activeTab} index={2}>
+              <Box
+                sx={{
+                  minHeight: 400,
+                  width: "100%",
+                  p: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {hotspotsLoading && (
+                  <Skeleton variant="rectangular" height={400} width="100%" />
+                )}
+
+                {hotspotsError && !hotspotsLoading && (
+                  <Box sx={{ textAlign: "center", color: "text.secondary" }}>
+                    <Typography variant="body1">{hotspotsError}</Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      Try running a &quot;full&quot; or &quot;mapping&quot;
+                      scenario to generate the hotspots plot.
+                    </Typography>
+                  </Box>
+                )}
+
+                {hotspotsUrl && !hotspotsLoading && (
+                  <Box sx={{ textAlign: "center", width: "100%" }}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{ mb: 2, fontWeight: 600 }}
+                    >
+                      Camera Hotspots (DBSCAN Clustering)
+                    </Typography>
+                    <img
+                      src={hotspotsUrl}
+                      alt="Surveillance Hotspots Plot"
+                      style={{
+                        maxWidth: "100%",
+                        height: "auto",
+                        borderRadius: 4,
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
+            </TabPanel>
+
+            {/* Statistics Tab */}
+            <TabPanel value={activeTab} index={3}>
+              <Box sx={{ p: 2 }}>
+                {chartsLoading && (
+                  <Box className="flex flex-col gap-4">
+                    <Skeleton variant="rectangular" height={300} />
+                    <Skeleton variant="rectangular" height={300} />
+                  </Box>
+                )}
+
+                {chartsError && !chartsLoading && (
+                  <Box
+                    sx={{
+                      p: 4,
+                      textAlign: "center",
+                      color: "text.secondary",
+                    }}
+                  >
+                    <Typography variant="body1">{chartsError}</Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      Try running a &quot;full&quot; or &quot;report&quot;
+                      scenario to generate charts.
+                    </Typography>
+                  </Box>
+                )}
+
+                {!chartsLoading && !chartsError && (
+                  <Grid container spacing={3}>
+                    {privacyChartUrl && (
+                      <Grid size={{ xs: 12, lg: 6 }}>
+                        <Box sx={{ textAlign: "center" }}>
+                          <Typography
+                            variant="subtitle1"
+                            sx={{ mb: 1, fontWeight: 600 }}
+                          >
+                            Privacy Analysis
+                          </Typography>
+                          <img
+                            src={privacyChartUrl}
+                            alt="Privacy Analysis Chart"
+                            style={{
+                              maxWidth: "100%",
+                              height: "auto",
+                              borderRadius: 4,
+                            }}
+                          />
+                        </Box>
+                      </Grid>
+                    )}
+                    {sensitivityChartUrl && (
+                      <Grid size={{ xs: 12, lg: 6 }}>
+                        <Box sx={{ textAlign: "center" }}>
+                          <Typography
+                            variant="subtitle1"
+                            sx={{ mb: 1, fontWeight: 600 }}
+                          >
+                            Sensitivity Analysis
+                          </Typography>
+                          <img
+                            src={sensitivityChartUrl}
+                            alt="Sensitivity Analysis Chart"
+                            style={{
+                              maxWidth: "100%",
+                              height: "auto",
+                              borderRadius: 4,
+                            }}
+                          />
+                        </Box>
+                      </Grid>
+                    )}
+                    {!privacyChartUrl && !sensitivityChartUrl && (
+                      <Grid size={{ xs: 12 }}>
+                        <Box
+                          sx={{
+                            p: 4,
+                            textAlign: "center",
+                            color: "text.secondary",
+                          }}
+                        >
+                          <Typography variant="body1">
+                            No charts available.
+                          </Typography>
+                          <Typography variant="body2" sx={{ mt: 1 }}>
+                            Try running a &quot;full&quot; or &quot;report&quot;
+                            scenario to generate statistical charts.
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                )}
+              </Box>
+            </TabPanel>
+          </Paper>
         </Grid>
       </Grid>
     </Container>
