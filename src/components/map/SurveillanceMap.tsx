@@ -1,5 +1,5 @@
 // src/components/map/SurveillanceMap.tsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -9,7 +9,6 @@ import type {
   GeoJsonProperties,
   Geometry,
 } from "geojson";
-import type { RouteProperties } from "../../types/api";
 
 // Fix for default marker icons not showing up
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -24,9 +23,6 @@ L.Icon.Default.mergeOptions({
 
 interface SurveillanceMapProps {
   enrichedGeoJson: FeatureCollection<Geometry, GeoJsonProperties> | null;
-  routeGeoJson: FeatureCollection<Geometry, RouteProperties> | null; // Use RouteProperties here
-  showEnrichedLayer: boolean;
-  showRouteLayer: boolean;
   center?: L.LatLngExpression;
   zoom?: number;
 }
@@ -49,30 +45,36 @@ const RecenterAutomatically: React.FC<{
 
 const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
   enrichedGeoJson,
-  routeGeoJson,
-  showEnrichedLayer,
-  showRouteLayer,
   center = [0, 0], // Default center
   zoom = 2, // Default zoom
 }) => {
-  const geoJsonRefs = useRef<{ [key: string]: L.GeoJSON | null }>({});
+  // Custom camera icon
+  const cameraIcon = L.icon({
+    iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+    iconRetinaUrl:
+      "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+    shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+  });
 
   // Custom style for enriched points (e.g., cameras)
   const onEachEnrichedFeature = (feature: Feature, layer: L.Layer) => {
-    if (feature.properties && feature.properties.name) {
-      layer.bindPopup(feature.properties.name as string); // Cast to string
-    }
-  };
+    if (feature.properties) {
+      const props = feature.properties;
+      let popupContent = "<div style='min-width: 200px;'>";
 
-  // Custom style for route GeoJSON (color-coded)
-  const getRouteStyle = (feature: Feature<Geometry, RouteProperties>) => {
-    // Ensure properties exist and risk_score is a number
-    const riskScore = feature.properties?.risk_score ?? 0;
-    return {
-      color: riskScore > 0.5 ? "red" : "green", // Example: green for safe, red for risky
-      weight: 5,
-      opacity: 0.7,
-    };
+      // Display all available properties
+      if (props.name) popupContent += `<b>${props.name}</b><br/>`;
+      if (props.type) popupContent += `Type: ${props.type}<br/>`;
+      if (props.description)
+        popupContent += `Description: ${props.description}<br/>`;
+
+      popupContent += "</div>";
+      layer.bindPopup(popupContent);
+    }
   };
 
   // Get initial center and zoom from GeoJSON if available
@@ -84,51 +86,28 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
       center={initialCenter}
       zoom={initialZoom}
       scrollWheelZoom={true}
-      className="h-[600px] w-full rounded-lg shadow-md"
+      style={{ height: "700px", width: "100%" }}
+      className="rounded-lg shadow-md"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        maxZoom={19}
       />
 
-      {showEnrichedLayer && enrichedGeoJson && (
-        <GeoJSON
-          key="enriched-layer"
-          data={enrichedGeoJson}
-          onEachFeature={onEachEnrichedFeature}
-          pointToLayer={(_feature, latlng) => {
-            // Renamed to _feature
-            // Customize marker for points if desired (e.g., custom icon)
-            return L.marker(latlng);
-          }}
-          ref={(el) => {
-            geoJsonRefs.current.enriched = el;
-          }}
-        />
+      {enrichedGeoJson && (
+        <>
+          <GeoJSON
+            key="enriched-layer"
+            data={enrichedGeoJson}
+            onEachFeature={onEachEnrichedFeature}
+            pointToLayer={(_feature, latlng) => {
+              return L.marker(latlng, { icon: cameraIcon });
+            }}
+          />
+          <RecenterAutomatically geoJson={enrichedGeoJson} />
+        </>
       )}
-
-      {showRouteLayer && routeGeoJson && (
-        <GeoJSON
-          key="route-layer"
-          data={routeGeoJson}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          style={getRouteStyle as any} // Cast to any to satisfy Leaflet's less strict StyleFunction type
-          ref={(el) => {
-            geoJsonRefs.current.route = el;
-          }}
-        />
-      )}
-
-      {(showEnrichedLayer && enrichedGeoJson) ||
-      (showRouteLayer && routeGeoJson) ? (
-        <RecenterAutomatically
-          geoJson={
-            showEnrichedLayer && enrichedGeoJson
-              ? enrichedGeoJson
-              : (routeGeoJson as FeatureCollection<Geometry, GeoJsonProperties>)
-          }
-        />
-      ) : null}
     </MapContainer>
   );
 };

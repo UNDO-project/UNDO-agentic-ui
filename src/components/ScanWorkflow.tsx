@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PipelineConfig from "./form/PipelineConfig";
 import ProgressMonitor from "./monitor/ProgressMonitor";
 import Dashboard from "./dashboard/Dashboard";
@@ -8,6 +8,8 @@ import { useSnackbar } from "../hooks/useSnackbar";
 
 type AppView = "config" | "monitor" | "dashboard";
 
+const LAST_TASK_KEY = "lastCompletedTask";
+
 function ScanWorkflow() {
   const [currentView, setCurrentView] = useState<AppView>("config");
   const [isLoading, setIsLoading] = useState(false);
@@ -15,6 +17,16 @@ function ScanWorkflow() {
   const [cityForResults, setCityForResults] = useState<string | null>(null);
 
   const { showSnackbar } = useSnackbar();
+
+  // Load last task from localStorage on mount
+  useEffect(() => {
+    const savedTask = localStorage.getItem(LAST_TASK_KEY);
+    if (savedTask) {
+      const { taskId: savedTaskId, city: savedCity } = JSON.parse(savedTask);
+      setTaskId(savedTaskId);
+      setCityForResults(savedCity);
+    }
+  }, []);
 
   const handleStartScan = async (request: PipelineRequest) => {
     setIsLoading(true);
@@ -36,21 +48,39 @@ function ScanWorkflow() {
   };
 
   const handleBackToConfig = () => {
-    setTaskId(null);
-    setCityForResults(null);
     setCurrentView("config"); // Switch back to config view
   };
 
   const handleMonitorComplete = () => {
+    // Save completed task to localStorage
+    if (taskId && cityForResults) {
+      localStorage.setItem(
+        LAST_TASK_KEY,
+        JSON.stringify({ taskId, city: cityForResults }),
+      );
+    }
     // This is called when the monitor indicates the task is complete
     setCurrentView("dashboard"); // Switch to dashboard view
     showSnackbar("Scan completed! Viewing results.", "success");
   };
 
+  const handleViewLastResults = () => {
+    if (taskId && cityForResults) {
+      setCurrentView("dashboard");
+    }
+  };
+
+  const hasLastResults = taskId && cityForResults;
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-4">
       {currentView === "config" && (
-        <PipelineConfig onStartScan={handleStartScan} isLoading={isLoading} />
+        <PipelineConfig
+          onStartScan={handleStartScan}
+          isLoading={isLoading}
+          onViewLastResults={hasLastResults ? handleViewLastResults : undefined}
+          lastResultsCity={hasLastResults ? cityForResults : undefined}
+        />
       )}
 
       {currentView === "monitor" && taskId && cityForResults && (

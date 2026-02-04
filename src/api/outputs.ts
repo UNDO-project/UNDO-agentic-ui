@@ -9,7 +9,7 @@ export const getCityOutputs = async (
   return response.data;
 };
 
-// Download a file by filename and city using the correct API endpoint
+// Generic function to download any file by filename and city
 export const downloadFile = async (
   filename: string,
   city: string,

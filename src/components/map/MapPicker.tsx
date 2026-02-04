@@ -101,8 +101,8 @@ const MapPicker: React.FC<MapPickerProps> = ({
   return (
     <Box className="relative w-full h-full">
       <MapContainer
-        center={[51.505, -0.09]} // Default center (London) - ideally this should center on the "City" input if possible
-        zoom={13}
+        center={[62.0, 15.0]} // Default center (Nordics - central Sweden/Norway)
+        zoom={5}
         scrollWheelZoom={true}
         style={{
           height: "100%",
