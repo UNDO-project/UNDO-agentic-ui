@@ -87,8 +87,8 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
       className="h-[600px] w-full rounded-lg shadow-md"
     >
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CartoDB</a>'
-        url="https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png" // Dark theme tile layer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
       {showEnrichedLayer && enrichedGeoJson && (
