@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
-import PipelineConfig from "./components/form/PipelineConfig";
-import ProgressMonitor from "./components/monitor/ProgressMonitor";
-import Dashboard from "./components/dashboard/Dashboard";
-import type { PipelineRequest, TaskResponse } from "./types/api";
-import { startPipeline } from "./api/pipeline";
-import { useSnackbar } from "./hooks/useSnackbar";
+import PipelineConfig from "./form/PipelineConfig";
+import ProgressMonitor from "./monitor/ProgressMonitor";
+import Dashboard from "./dashboard/Dashboard";
+import type { PipelineRequest, TaskResponse } from "../types/api";
+import { startPipeline } from "../api/pipeline";
+import { useSnackbar } from "../hooks/useSnackbar";
 
 type AppView = "config" | "monitor" | "dashboard";
 
 const LAST_TASK_KEY = "lastCompletedTask";
 
-function App() {
+function ScanWorkflow() {
   const [currentView, setCurrentView] = useState<AppView>("config");
   const [isLoading, setIsLoading] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -32,7 +32,7 @@ function App() {
     setIsLoading(true);
     try {
       const response: TaskResponse = await startPipeline(request);
-      setTaskId(response.task_id);
+      setTaskId(response.task_id ?? response.id ?? null);
       setCityForResults(request.city);
       setCurrentView("monitor"); // Switch to monitor view
       showSnackbar("Pipeline started successfully!", "success");
@@ -73,7 +73,7 @@ function App() {
   const hasLastResults = taskId && cityForResults;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-4">
+    <div className="flex-1 flex flex-col items-center justify-center p-4">
       {currentView === "config" && (
         <PipelineConfig
           onStartScan={handleStartScan}
@@ -103,4 +103,4 @@ function App() {
   );
 }
 
-export default App;
+export default ScanWorkflow;

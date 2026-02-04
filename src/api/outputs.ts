@@ -44,15 +44,25 @@ export const getMap = async (
   return response.data;
 };
 
-export const getRouteGeoJson = async (city: string): Promise<Blob> => {
-  // Assuming route geojson has a specific name or can be fetched via a dedicated endpoint
-  // Based on CLI_BACKEND_NOTES, it's route_<hash>.geojson which implies we might need the hash.
-  // For now, let's assume a generic way or rely on downloadFile with the specific path from getCityOutputs
-  // For testing, if the backend has a direct way to get *the* route geojson for a city, we'd use that.
-  // Let's create a placeholder for now.
-  const response = await api.get(`/outputs/${city}/route`, {
-    params: { format: "geojson" },
+export const getChart = async (
+  city: string,
+  chartType: "privacy" | "sensitivity",
+): Promise<Blob> => {
+  const response = await api.get(`/outputs/${city}/charts`, {
+    params: { chart: chartType },
     responseType: "blob",
   });
   return response.data;
+};
+
+// Get the URL for embedding heatmap in iframe
+export const getHeatmapUrl = (city: string): string => {
+  return `/api/v1/outputs/${city}/map?map_type=heatmap`;
+};
+
+// Get the hotspots plot PNG image
+export const getHotspotsPlot = async (city: string): Promise<Blob> => {
+  // Hotspots are generated as PNG files: {city}_enriched_hotspots.png
+  const filename = `${city}_enriched_hotspots.png`;
+  return downloadFile(filename, city);
 };

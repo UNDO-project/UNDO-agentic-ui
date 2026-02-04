@@ -8,18 +8,19 @@ import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import type { TaskResult, OutputFile } from "../../types/api";
 
 interface StatsPanelProps {
+  city: string;
   taskResult: TaskResult | null;
   outputFiles: OutputFile[];
   onDownloadFile: (fileName: string) => void;
 }
 
 const StatsPanel: React.FC<StatsPanelProps> = ({
+  city,
   taskResult,
   outputFiles,
   onDownloadFile,
 }) => {
   const totalCameras = taskResult?.analyze?.element_count ?? 0;
-  const scraped = taskResult?.scrape?.elements_count ?? 0;
   const hasRouting = taskResult?.routing?.success ?? false;
   const exposureScore = taskResult?.routing?.exposure_score;
   const routeLength = taskResult?.routing?.length_m;
@@ -36,18 +37,6 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
             </Typography>
             <Typography variant="body2" color="textSecondary">
               Cameras Analyzed
-            </Typography>
-          </Box>
-        </Grid>
-
-        {/* Scraped Elements */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Box className="p-3 text-center rounded-lg bg-green-50">
-            <Typography variant="h4" className="font-bold text-green-600">
-              {scraped}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Elements Scraped
             </Typography>
           </Box>
         </Grid>
@@ -120,7 +109,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
               {outputFiles.slice(0, 3).map((file) => {
                 const fileExt = file.name.split(".").pop() || "";
                 const baseName = file.name
-                  .replace(`${taskResult?.city}_`, "")
+                  .replace(`${city}_`, "")
                   .replace(`.${fileExt}`, "");
                 return (
                   <Button

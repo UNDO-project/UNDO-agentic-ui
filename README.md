@@ -2,7 +2,7 @@
 
 ## Overview
 
-Welcome to the **Agentic Surveillance Research Frontend**. This application acts as a specialized navigation tool designed to help understand and visualize surveillance levels in a city.
+This application acts as a specialized navigation tool designed to help understand and visualize surveillance levels in a city.
 
 - Download data for surveillance cameras in a city.
 - See a map with all cameras
@@ -13,7 +13,7 @@ Welcome to the **Agentic Surveillance Research Frontend**. This application acts
 **Key Features:**
 
 - **City Scanning:** Select a city to scan for known surveillance camera locations using public data.
-- **Route Planning:** Choose a starting point and a destination. The app calculates a path that avoids cameras where possible, prioritizing your privacy.
+- **Route Planning:** Choose a starting point and a destination. The app calculates a path that avoids cameras where possible.
 - **Visual Dashboard:** See the results on an interactive map. Cameras are marked, "risky" areas are highlighted, and safe paths are clearly drawn.
 - **Real-time Monitoring:** Watch the system as it gathers data and processes your request in real-time.
 
@@ -27,7 +27,17 @@ Welcome to the **Agentic Surveillance Research Frontend**. This application acts
 ### Installation
 
 1.  Clone this repository to your local machine.
+
+```bash
+git clone git@github.com:jethronap/UNDO-agentic-ui.git
+```
+
 2.  Navigate to the project folder.
+
+```bash
+cd UNDO-agentic-ui/
+```
+
 3.  Install the necessary dependencies:
 
 ```bash
