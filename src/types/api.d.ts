@@ -69,6 +69,17 @@ export interface TaskResponse {
      * dataset.
      */
     analysis_skipped?: boolean;
+    /**
+     * Number of cameras the analyzer has enriched so far. Populated
+     * once per analyzer batch (every few seconds). Mid-run only —
+     * absent during scraping and on the cache-hit / skip paths.
+     */
+    enriched_count?: number;
+    /**
+     * Total cameras to enrich for this run. Mirrors ``elements_count``
+     * but pairs naturally with ``enriched_count`` for caption rendering.
+     */
+    enriched_total?: number;
   };
   result?: TaskResult | null;
 }

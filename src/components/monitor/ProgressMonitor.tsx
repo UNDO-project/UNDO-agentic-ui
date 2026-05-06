@@ -56,6 +56,10 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
   const [routingEnabled, setRoutingEnabled] = useState<boolean>(true);
   const [elementsCount, setElementsCount] = useState<number | null>(null);
   const [analysisSkipped, setAnalysisSkipped] = useState<boolean>(false);
+  // Per-batch analyzer progress. Both null until the first batch
+  // finishes and the backend populates the metadata fields.
+  const [enrichedCount, setEnrichedCount] = useState<number | null>(null);
+  const [enrichedTotal, setEnrichedTotal] = useState<number | null>(null);
 
   // Live "still running" indicator state. ``now`` is bumped by a 1s ticker
   // so elapsed-time and staleness derivations re-render once per second
@@ -142,6 +146,17 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
             setAnalysisSkipped(status.metadata.analysis_skipped);
           }
 
+          // Per-batch analyzer progress. Backend populates these once
+          // per chunk (~every few seconds), so the caption refines
+          // within ≤ 1.5s of each batch landing. Absent on scraping,
+          // analyzer-skip, and cache-hit paths.
+          if (typeof status.metadata?.enriched_count === "number") {
+            setEnrichedCount(status.metadata.enriched_count);
+          }
+          if (typeof status.metadata?.enriched_total === "number") {
+            setEnrichedTotal(status.metadata.enriched_total);
+          }
+
           // Check for completion
           if (status.status === "completed") {
             setIsComplete(true);
@@ -189,6 +204,8 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
   useEffect(() => {
     setRunStartedAt(null);
     setNow(Date.now());
+    setEnrichedCount(null);
+    setEnrichedTotal(null);
     lastSuccessfulPollAtRef.current = Date.now();
     lastChangeAtRef.current = Date.now();
     lastSeenProgressRef.current = null;
@@ -293,6 +310,13 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
               <>
                 Reusing prior analysis of <strong>{elementsCount}</strong>{" "}
                 cameras.
+              </>
+            ) : enrichedCount !== null &&
+              enrichedTotal !== null &&
+              enrichedCount < enrichedTotal ? (
+              <>
+                Enriching <strong>{enrichedCount}</strong> of{" "}
+                <strong>{enrichedTotal}</strong> cameras…
               </>
             ) : (
               <>
