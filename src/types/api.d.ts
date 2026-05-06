@@ -56,6 +56,19 @@ export interface TaskResponse {
     scenario: Scenario;
     last_message?: string; // Current stage message from backend
     routing_enabled?: boolean;
+    /**
+     * Number of OSM elements (cameras) the analyzer will process.
+     * Populated by the backend the moment scrape returns, before the
+     * analyzer stage starts; persists through completion.
+     */
+    elements_count?: number;
+    /**
+     * True when the orchestrator is reusing prior enriched outputs
+     * (probe-and-compare cache hit on identical scrape data). The
+     * element count still reflects how many cameras are in the reused
+     * dataset.
+     */
+    analysis_skipped?: boolean;
   };
   result?: TaskResult | null;
 }

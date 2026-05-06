@@ -34,6 +34,8 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [routingEnabled, setRoutingEnabled] = useState<boolean>(true);
+  const [elementsCount, setElementsCount] = useState<number | null>(null);
+  const [analysisSkipped, setAnalysisSkipped] = useState<boolean>(false);
 
   const { showSnackbar } = useSnackbar();
 
@@ -66,6 +68,16 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
           // Fallback: check if result has routing data
           if (status.result?.routing !== undefined) {
             setRoutingEnabled(true);
+          }
+
+          // Element count + analyzer-skip signal.
+          // Both are populated by the backend the moment scrape returns,
+          // so they show up here within ~1.5s of the analyzer transition.
+          if (typeof status.metadata?.elements_count === "number") {
+            setElementsCount(status.metadata.elements_count);
+          }
+          if (typeof status.metadata?.analysis_skipped === "boolean") {
+            setAnalysisSkipped(status.metadata.analysis_skipped);
           }
 
           // Check for completion
@@ -121,7 +133,7 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
 
   return (
     <Container maxWidth="lg" className="py-8">
-      <Box className="mb-6 flex items-center justify-between">
+      <Box className="flex items-center justify-between mb-6">
         <Box className="flex gap-2">
           <Button
             startIcon={<ArrowBackIcon />}
@@ -166,14 +178,33 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
           routingEnabled={routingEnabled}
         />
 
-        <Box className="mb-2 flex justify-between text-sm text-gray-600">
+        {elementsCount !== null && (
+          <Typography
+            variant="body2"
+            className="mb-2 text-gray-400"
+            data-testid="elements-count-caption"
+          >
+            {analysisSkipped ? (
+              <>
+                Reusing prior analysis of <strong>{elementsCount}</strong>{" "}
+                cameras.
+              </>
+            ) : (
+              <>
+                Analyzing <strong>{elementsCount}</strong> cameras…
+              </>
+            )}
+          </Typography>
+        )}
+
+        <Box className="flex justify-between mb-2 text-sm text-gray-600">
           <span>Progress</span>
           <span>{Math.round(progress)}%</span>
         </Box>
         <LinearProgress
           variant="determinate"
           value={progress}
-          className="mb-4 rounded h-2"
+          className="h-2 mb-4 rounded"
           color={error ? "error" : isComplete ? "success" : "primary"}
         />
 
