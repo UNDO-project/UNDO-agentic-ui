@@ -60,6 +60,16 @@ export const getHeatmapUrl = (city: string): string => {
   return `/api/v1/outputs/${city}/map?map_type=heatmap`;
 };
 
+// Fetch the LLM-generated city report as raw markdown text.
+// Returns null on 404 so callers can hide the Report tab gracefully.
+export const getCityReport = async (city: string): Promise<string> => {
+  const response = await api.get(`/outputs/${city}/report`, {
+    responseType: "text",
+    transformResponse: [(data) => data], // bypass axios JSON auto-parse
+  });
+  return response.data;
+};
+
 // Get the hotspots plot PNG image
 export const getHotspotsPlot = async (city: string): Promise<Blob> => {
   // Hotspots are generated as PNG files: {city}_enriched_hotspots.png
