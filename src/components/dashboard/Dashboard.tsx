@@ -17,6 +17,10 @@ import WhatshotIcon from "@mui/icons-material/Whatshot";
 import BubbleChartIcon from "@mui/icons-material/BubbleChart";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import RouteIcon from "@mui/icons-material/Route";
+import DescriptionIcon from "@mui/icons-material/Description";
+import DownloadIcon from "@mui/icons-material/Download";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import SurveillanceMap from "../map/SurveillanceMap";
 import StatsPanel from "./StatsPanel";
 import {
@@ -26,6 +30,7 @@ import {
   getChart,
   getHeatmapUrl,
   getHotspotsPlot,
+  getCityReport,
 } from "../../api/outputs";
 import { getPipelineStatus } from "../../api/pipeline";
 import { useSnackbar } from "../../hooks/useSnackbar";
@@ -89,6 +94,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   // Route URL
   const [routeUrl, setRouteUrl] = useState<string | null>(null);
 
+  // Report markdown (lazy-loaded on Report tab activation)
+  const [reportMarkdown, setReportMarkdown] = useState<string | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+
   const { showSnackbar } = useSnackbar();
 
   const fetchDashboardData = useCallback(async () => {
@@ -140,6 +150,26 @@ const Dashboard: React.FC<DashboardProps> = ({
       setHotspotsLoading(false);
     }
   }, [city, hotspotsUrl]);
+
+  // Fetch the LLM-generated city report when the Report tab is selected.
+  // Lazy because the dashboard mounts on every revisit; we only pay the
+  // markdown round-trip when the user actually opens the tab.
+  const fetchReport = useCallback(async () => {
+    if (reportMarkdown) return; // Already loaded
+
+    setReportLoading(true);
+    setReportError(null);
+
+    try {
+      const md = await getCityReport(city);
+      setReportMarkdown(md);
+    } catch (err) {
+      console.error("Failed to fetch city report:", err);
+      setReportError("Report not available for this analysis.");
+    } finally {
+      setReportLoading(false);
+    }
+  }, [city, reportMarkdown]);
 
   // Fetch charts when Statistics tab is selected
   const fetchCharts = useCallback(async () => {
@@ -195,6 +225,23 @@ const Dashboard: React.FC<DashboardProps> = ({
       fetchCharts();
     }
   }, [activeTab, fetchCharts]);
+
+  // Report visibility is derived from the city's outputs list — the
+  // analyzer writes ``<city>_report.md`` only when ``generate_report``
+  // was on, so a present file is the canonical signal. Case-insensitive
+  // match because backends lowercase city names when building paths.
+  const hasReport = outputFiles.some((f) =>
+    f.name.toLowerCase().endsWith("_report.md"),
+  );
+
+  // Load the report when tab 4 (Report) is selected. Gated on
+  // ``hasReport`` so we don't fire a useless 404 when the tab isn't
+  // even visible.
+  useEffect(() => {
+    if (activeTab === 4 && hasReport) {
+      fetchReport();
+    }
+  }, [activeTab, fetchReport, hasReport]);
 
   // Cleanup blob URLs on unmount
   useEffect(() => {
@@ -262,7 +309,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     );
   }
 
-  // Determine which tabs to show
+  // Determine which tabs to show. ``hasReport`` is derived above so the
+  // tab-load effect and the JSX share a single source of truth.
   const hasRoute = !!routeUrl;
 
   return (
@@ -307,35 +355,49 @@ const Dashboard: React.FC<DashboardProps> = ({
               }}
             >
               <Tab
+                value={0}
                 icon={<MapIcon />}
                 label="Camera Map"
                 id="dashboard-tab-0"
                 aria-controls="dashboard-tabpanel-0"
               />
               <Tab
+                value={1}
                 icon={<WhatshotIcon />}
                 label="Heatmap"
                 id="dashboard-tab-1"
                 aria-controls="dashboard-tabpanel-1"
               />
               <Tab
+                value={2}
                 icon={<BubbleChartIcon />}
                 label="Hotspots"
                 id="dashboard-tab-2"
                 aria-controls="dashboard-tabpanel-2"
               />
               <Tab
+                value={3}
                 icon={<BarChartIcon />}
                 label="Statistics"
                 id="dashboard-tab-3"
                 aria-controls="dashboard-tabpanel-3"
               />
-              {hasRoute && (
+              {hasReport && (
                 <Tab
-                  icon={<RouteIcon />}
-                  label="Route"
+                  value={4}
+                  icon={<DescriptionIcon />}
+                  label="Report"
                   id="dashboard-tab-4"
                   aria-controls="dashboard-tabpanel-4"
+                />
+              )}
+              {hasRoute && (
+                <Tab
+                  value={5}
+                  icon={<RouteIcon />}
+                  label="Route"
+                  id="dashboard-tab-5"
+                  aria-controls="dashboard-tabpanel-5"
                 />
               )}
             </Tabs>
@@ -508,9 +570,100 @@ const Dashboard: React.FC<DashboardProps> = ({
               </Box>
             </TabPanel>
 
+            {/* Report Tab (conditional) */}
+            {hasReport && (
+              <TabPanel value={activeTab} index={4}>
+                <Box sx={{ p: 2 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 2,
+                    }}
+                  >
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      Surveillance Report — {city}
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => handleDownload(`${city}_report.md`)}
+                      disabled={!reportMarkdown}
+                    >
+                      Download
+                    </Button>
+                  </Box>
+
+                  {reportLoading && (
+                    <Box className="flex flex-col gap-2">
+                      <Skeleton variant="text" height={32} width="40%" />
+                      <Skeleton variant="rectangular" height={120} />
+                      <Skeleton variant="rectangular" height={120} />
+                    </Box>
+                  )}
+
+                  {reportError && !reportLoading && (
+                    <Box
+                      sx={{
+                        p: 4,
+                        textAlign: "center",
+                        color: "text.secondary",
+                      }}
+                    >
+                      <Typography variant="body1">{reportError}</Typography>
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        Re-run with the &quot;full&quot; preset (or
+                        &quot;basic&quot; with --report) to generate one.
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {reportMarkdown && !reportLoading && !reportError && (
+                    <Box
+                      sx={{
+                        // Sensible markdown typography. Mirrors MUI Typography
+                        // scale so the report visually fits the rest of the
+                        // dashboard without leaning on global CSS.
+                        "& h1, & h2, & h3": {
+                          fontWeight: 600,
+                          mt: 2,
+                          mb: 1,
+                        },
+                        "& h1": { fontSize: "1.5rem" },
+                        "& h2": { fontSize: "1.25rem" },
+                        "& h3": { fontSize: "1.1rem" },
+                        "& p": { mb: 1.5, lineHeight: 1.6 },
+                        "& ul, & ol": { pl: 3, mb: 1.5 },
+                        "& li": { mb: 0.5 },
+                        "& code": {
+                          bgcolor: "action.hover",
+                          px: 0.5,
+                          borderRadius: 0.5,
+                          fontFamily: "monospace",
+                        },
+                      }}
+                    >
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        // Reject embedded HTML that could execute or escape
+                        // the dashboard frame; report content comes from a
+                        // local LLM but defense-in-depth costs us nothing.
+                        disallowedElements={["script", "iframe"]}
+                        unwrapDisallowed={false}
+                      >
+                        {reportMarkdown}
+                      </ReactMarkdown>
+                    </Box>
+                  )}
+                </Box>
+              </TabPanel>
+            )}
+
             {/* Route Tab (conditional) */}
             {hasRoute && (
-              <TabPanel value={activeTab} index={4}>
+              <TabPanel value={activeTab} index={5}>
                 <Box
                   sx={{
                     height: 600,
