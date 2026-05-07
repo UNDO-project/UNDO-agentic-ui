@@ -1,6 +1,6 @@
 // src/types/api.d.ts
 
-export type Scenario = "basic" | "full" | "quick" | "report" | "mapping";
+export type Scenario = "basic" | "full";
 export type TaskStatus =
   | "pending"
   | "running"
@@ -18,11 +18,29 @@ export interface RoutingConfig {
   end_lon: number;
 }
 
+/**
+ * Per-toggle overrides layered on top of the chosen scenario preset.
+ * Every field is optional; only set fields are merged into the backend's
+ * ``PipelineConfig``. An empty object keeps the preset baseline exactly.
+ */
+export interface OutputOverrides {
+  generate_geojson?: boolean;
+  compute_stats?: boolean;
+  generate_chart?: boolean;
+  generate_heatmap?: boolean;
+  generate_hotspots?: boolean;
+  plot_zone_sensitivity?: boolean;
+  plot_sensitivity_reasons?: boolean;
+  plot_hotspots?: boolean;
+}
+
 export interface PipelineRequest {
   city: string;
   country?: string;
   scenario: Scenario;
+  overrides?: OutputOverrides;
   routing_config?: RoutingConfig;
+  force_refresh?: boolean;
 }
 
 export interface TaskResult {
