@@ -287,15 +287,20 @@ const Dashboard: React.FC<DashboardProps> = ({
   // their filenames carry the city stem and the dedicated endpoint
   // wasn't extended to know about them.
   const fetchCharts = useCallback(async () => {
-    if (
-      privacyChartUrl &&
-      sensitivityChartUrl &&
-      operatorChartUrl &&
-      manufacturerChartUrl &&
-      timelineChartUrl &&
-      zoneSensitivityChartUrl
-    )
-      return; // Already loaded
+    // "Already loaded" means every chart whose file actually exists
+    // has been fetched. A chart whose file is genuinely absent (e.g.
+    // manufacturer when OSM has no data — Backend HF#4) is treated
+    // as loaded too, otherwise this guard would never fire and the
+    // tab-load effect would re-trigger the fetch on every render
+    // (causing the Statistics tab to flicker).
+    const allLoaded =
+      (!chartFiles.privacy || privacyChartUrl !== null) &&
+      (!chartFiles.sensitivity || sensitivityChartUrl !== null) &&
+      (!chartFiles.operator || operatorChartUrl !== null) &&
+      (!chartFiles.manufacturer || manufacturerChartUrl !== null) &&
+      (!chartFiles.timeline || timelineChartUrl !== null) &&
+      (!chartFiles.zoneSensitivity || zoneSensitivityChartUrl !== null);
+    if (allLoaded) return;
 
     setChartsLoading(true);
     setChartsError(null);
