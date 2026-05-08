@@ -14,12 +14,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import type { CameraFilter } from "../../types/api";
+import type { MapCameraFilter } from "../../types/api";
 
 interface CameraFilterPanelProps {
   operators: string[];
-  filter: CameraFilter;
-  onChange: (next: CameraFilter) => void;
+  filter: MapCameraFilter;
+  onChange: (next: MapCameraFilter) => void;
   visibleCount: number;
   totalCount: number;
 }
@@ -32,7 +32,7 @@ const CameraFilterPanel: React.FC<CameraFilterPanelProps> = ({
   totalCount,
 }) => {
   const updatePrivacy = (
-    key: keyof CameraFilter["privacy"],
+    key: keyof MapCameraFilter["privacy"],
     checked: boolean,
   ) => {
     onChange({
@@ -127,7 +127,7 @@ const CameraFilterPanel: React.FC<CameraFilterPanelProps> = ({
             onChange={(e) =>
               onChange({
                 ...filter,
-                sensitivity: e.target.value as CameraFilter["sensitivity"],
+                sensitivity: e.target.value as MapCameraFilter["sensitivity"],
               })
             }
           >
