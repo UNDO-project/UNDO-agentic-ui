@@ -26,7 +26,7 @@ import CameraFilterPanel from "../map/CameraFilterPanel";
 import {
   DEFAULT_CAMERA_FILTER,
   extractOperators,
-  matchesCameraFilter,
+  matchesMapCameraFilter,
 } from "../map/cameraFilter";
 import StatsPanel from "./StatsPanel";
 import {
@@ -40,7 +40,7 @@ import {
 } from "../../api/outputs";
 import { getPipelineStatus } from "../../api/pipeline";
 import { useSnackbar } from "../../hooks/useSnackbar";
-import type { CameraFilter, TaskResult, OutputFile } from "../../types/api";
+import type { MapCameraFilter, TaskResult, OutputFile } from "../../types/api";
 import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 
 interface DashboardProps {
@@ -84,10 +84,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
 
-  // Camera-map filter (Frontend #3). Pure client-side; resets on
+  // Camera-map filter. Pure client-side; resets on
   // city change so a fresh dashboard never inherits the prior city's
   // operator selection.
-  const [cameraFilter, setCameraFilter] = useState<CameraFilter>(
+  const [cameraFilter, setCameraFilter] = useState<MapCameraFilter>(
     DEFAULT_CAMERA_FILTER,
   );
 
@@ -132,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const visibleCameraCount = useMemo(() => {
     if (!enrichedGeoJson) return 0;
     return enrichedGeoJson.features.reduce(
-      (acc, f) => acc + (matchesCameraFilter(f, cameraFilter) ? 1 : 0),
+      (acc, f) => acc + (matchesMapCameraFilter(f, cameraFilter) ? 1 : 0),
       0,
     );
   }, [enrichedGeoJson, cameraFilter]);
@@ -217,7 +217,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [city, reportMarkdown]);
 
   // Fetch charts when Statistics tab is selected. Privacy and sensitivity
-  // come from the dedicated ``/charts`` endpoint; the three Backend #3/#4
+  // come from the dedicated ``/charts`` endpoint; the three Backend
   // charts (operator, manufacturer, install timeline) are looked up
   // through ``outputFiles`` and fetched via ``/file/{filename}`` since
   // their filenames carry the city stem and the dedicated endpoint
