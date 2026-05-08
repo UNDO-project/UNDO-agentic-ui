@@ -70,6 +70,36 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+/**
+ * Friendly fallback for tabs whose underlying artifact 404s. Replaces
+ * the iframe / image so the user never sees a raw FastAPI error body
+ * (``{"detail":"File not found"}``) or a broken-image icon.
+ */
+const ArtifactMissingPlaceholder: React.FC<{
+  label: string;
+  hint?: string;
+}> = ({ label, hint }) => (
+  <Box
+    sx={{
+      p: 4,
+      height: 600,
+      textAlign: "center",
+      color: "text.secondary",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+    }}
+  >
+    <Typography variant="body1">{label}</Typography>
+    {hint && (
+      <Typography variant="caption" sx={{ display: "block", mt: 1 }}>
+        {hint}
+      </Typography>
+    )}
+  </Box>
+);
+
 const Dashboard: React.FC<DashboardProps> = ({
   taskId,
   city,
@@ -112,6 +142,17 @@ const Dashboard: React.FC<DashboardProps> = ({
   // Route URL
   const [routeUrl, setRouteUrl] = useState<string | null>(null);
 
+  // Iframe-panel availability probes. Both panels embed the backend
+  // URL in an ``<iframe src=…>`` directly, so a 404 would otherwise
+  // render the FastAPI error body (`{"detail":"File not found"}`)
+  // inside the tab. We probe with HEAD on tab activation and swap
+  // the iframe out for a placeholder when the artifact is missing.
+  // ``null`` = not yet probed; ``true`` / ``false`` = probe result.
+  const [heatmapAvailable, setHeatmapAvailable] = useState<boolean | null>(
+    null,
+  );
+  const [routeAvailable, setRouteAvailable] = useState<boolean | null>(null);
+
   // Report markdown (lazy-loaded on Report tab activation)
   const [reportMarkdown, setReportMarkdown] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
@@ -144,6 +185,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   // hide everything in city B.
   useEffect(() => {
     setCameraFilter(DEFAULT_CAMERA_FILTER);
+    // Iframe availability is per-city — clear the prior probe results
+    // so we re-check rather than carry over a stale ``true``/``false``.
+    setHeatmapAvailable(null);
+    setRouteAvailable(null);
   }, [city]);
 
   const fetchDashboardData = useCallback(async () => {
@@ -311,6 +356,27 @@ const Dashboard: React.FC<DashboardProps> = ({
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  // Probe the heatmap URL with HEAD when its tab is opened. The
+  // result drives whether the iframe renders or the placeholder
+  // takes its place — never let the raw FastAPI 404 body surface.
+  // Probed once per (city, taskId); a ``null`` reset on city change
+  // re-runs it for the new city.
+  useEffect(() => {
+    if (activeTab !== 1) return;
+    if (heatmapAvailable !== null) return;
+    let cancelled = false;
+    fetch(getHeatmapUrl(city), { method: "HEAD" })
+      .then((r) => {
+        if (!cancelled) setHeatmapAvailable(r.ok);
+      })
+      .catch(() => {
+        if (!cancelled) setHeatmapAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, city, heatmapAvailable]);
+
   // Load hotspots when tab 2 (Hotspots) is selected
   useEffect(() => {
     if (activeTab === 2) {
@@ -341,6 +407,26 @@ const Dashboard: React.FC<DashboardProps> = ({
       fetchReport();
     }
   }, [activeTab, fetchReport, hasReport]);
+
+  // Probe the route URL with HEAD when its tab is opened, mirroring
+  // the heatmap pattern. Same iframe → 404 → JSON-body issue without
+  // this guard.
+  useEffect(() => {
+    if (activeTab !== 5) return;
+    if (!routeUrl) return;
+    if (routeAvailable !== null) return;
+    let cancelled = false;
+    fetch(routeUrl, { method: "HEAD" })
+      .then((r) => {
+        if (!cancelled) setRouteAvailable(r.ok);
+      })
+      .catch(() => {
+        if (!cancelled) setRouteAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, routeUrl, routeAvailable]);
 
   // Cleanup blob URLs on unmount
   useEffect(() => {
@@ -537,15 +623,26 @@ const Dashboard: React.FC<DashboardProps> = ({
                   bgcolor: "background.default",
                 }}
               >
-                <iframe
-                  src={getHeatmapUrl(city)}
-                  title="Surveillance Heatmap"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    border: "none",
-                  }}
-                />
+                {heatmapAvailable === null && (
+                  <Skeleton variant="rectangular" width="100%" height="100%" />
+                )}
+                {heatmapAvailable === false && (
+                  <ArtifactMissingPlaceholder
+                    label="Heatmap not available for this run."
+                    hint="Re-run with the Heatmap toggle enabled to generate it."
+                  />
+                )}
+                {heatmapAvailable === true && (
+                  <iframe
+                    src={getHeatmapUrl(city)}
+                    title="Surveillance Heatmap"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      border: "none",
+                    }}
+                  />
+                )}
               </Box>
             </TabPanel>
 
@@ -860,15 +957,30 @@ const Dashboard: React.FC<DashboardProps> = ({
                     bgcolor: "background.default",
                   }}
                 >
-                  <iframe
-                    src={routeUrl!}
-                    title="Privacy-Preserving Route"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      border: "none",
-                    }}
-                  />
+                  {routeAvailable === null && (
+                    <Skeleton
+                      variant="rectangular"
+                      width="100%"
+                      height="100%"
+                    />
+                  )}
+                  {routeAvailable === false && (
+                    <ArtifactMissingPlaceholder
+                      label="Route map not available."
+                      hint="The route artifact may have been cleaned up — re-run routing to regenerate it."
+                    />
+                  )}
+                  {routeAvailable === true && (
+                    <iframe
+                      src={routeUrl!}
+                      title="Privacy-Preserving Route"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        border: "none",
+                      }}
+                    />
+                  )}
                 </Box>
               </TabPanel>
             )}
