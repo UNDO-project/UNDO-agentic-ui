@@ -38,6 +38,13 @@ function formatDuration(ms: number): string {
 interface ProgressMonitorProps {
   taskId: string;
   city: string; // Added city prop
+  /**
+   * Whether the user enabled routing for this run. Drives the
+   * "Routing / Skipped" rendering in PipelineStepper. Sourced from the
+   * submitted request in ScanWorkflow — authoritative since the form is
+   * what decides whether routing runs at all.
+   */
+  routingEnabled: boolean;
   onComplete: () => void;
   onBack: () => void;
 }
@@ -45,6 +52,7 @@ interface ProgressMonitorProps {
 const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
   taskId,
   city, // Destructure city prop
+  routingEnabled,
   onComplete,
   onBack,
 }) => {
@@ -53,7 +61,6 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [routingEnabled, setRoutingEnabled] = useState<boolean>(true);
   const [elementsCount, setElementsCount] = useState<number | null>(null);
   const [analysisSkipped, setAnalysisSkipped] = useState<boolean>(false);
   // Per-batch analyzer progress. Both null until the first batch
@@ -125,15 +132,6 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
             if (!Number.isNaN(startedAt)) {
               setRunStartedAt(startedAt);
             }
-          }
-
-          // Check if routing is enabled (if metadata provides this info)
-          if (status.metadata?.routing_enabled !== undefined) {
-            setRoutingEnabled(status.metadata.routing_enabled);
-          }
-          // Fallback: check if result has routing data
-          if (status.result?.routing !== undefined) {
-            setRoutingEnabled(true);
           }
 
           // Element count + analyzer-skip signal.

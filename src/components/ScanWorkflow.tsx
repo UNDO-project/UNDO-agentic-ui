@@ -15,6 +15,13 @@ function ScanWorkflow() {
   const [isLoading, setIsLoading] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [cityForResults, setCityForResults] = useState<string | null>(null);
+  // Tracks whether the user enabled routing for the in-flight run so the
+  // ProgressMonitor stepper can render the Routing step as "Skipped" up
+  // front instead of leaving it pending until completion. Only meaningful
+  // for runs we just kicked off — completed runs go straight to the
+  // dashboard and never mount ProgressMonitor.
+  const [routingEnabledForRun, setRoutingEnabledForRun] =
+    useState<boolean>(false);
 
   const { showSnackbar } = useSnackbar();
 
@@ -34,6 +41,7 @@ function ScanWorkflow() {
       const response: TaskResponse = await startPipeline(request);
       setTaskId(response.task_id ?? response.id ?? null);
       setCityForResults(request.city);
+      setRoutingEnabledForRun(request.routing_config !== undefined);
       setCurrentView("monitor"); // Switch to monitor view
       showSnackbar("Pipeline started successfully!", "success");
     } catch (err) {
@@ -87,6 +95,7 @@ function ScanWorkflow() {
         <ProgressMonitor
           taskId={taskId}
           city={cityForResults}
+          routingEnabled={routingEnabledForRun}
           onBack={handleBackToConfig}
           onComplete={handleMonitorComplete}
         />
