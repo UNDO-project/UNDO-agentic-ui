@@ -1,21 +1,80 @@
 // src/components/form/PipelineConfig.tsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   TextField,
-  MenuItem,
-  Select,
   FormControl,
-  InputLabel,
   Button,
   Box,
   Typography,
   Switch,
   FormControlLabel,
+  FormGroup,
+  Checkbox,
   Grid,
-  type SelectChangeEvent,
+  Collapse,
+  ToggleButton,
+  ToggleButtonGroup,
+  Autocomplete,
 } from "@mui/material";
-import type { Scenario, PipelineRequest, RoutingConfig } from "../../types/api";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import type {
+  Scenario,
+  PipelineRequest,
+  RoutingConfig,
+  OutputOverrides,
+  CameraFilter,
+} from "../../types/api";
 import MapPicker from "../map/MapPicker"; // Uncommented MapPicker import
+import { getGeoJson } from "../../api/outputs";
+import {
+  extractOperators,
+  extractSurveillanceTypes,
+} from "../map/cameraFilter";
+
+/**
+ * Effective output toggle values for each scenario preset. Mirrors the
+ * backend's ``PipelineConfig.from_scenario`` baseline so the UI can show
+ * the user what the preset will produce before any override is applied.
+ */
+const PRESET_DEFAULTS: Record<Scenario, Required<OutputOverrides>> = {
+  basic: {
+    generate_geojson: true,
+    compute_stats: true,
+    generate_chart: false,
+    generate_heatmap: false,
+    generate_hotspots: false,
+    plot_zone_sensitivity: false,
+    plot_sensitivity_reasons: false,
+    plot_hotspots: false,
+  },
+  full: {
+    generate_geojson: true,
+    compute_stats: true,
+    generate_chart: true,
+    generate_heatmap: true,
+    generate_hotspots: true,
+    plot_zone_sensitivity: true,
+    plot_sensitivity_reasons: true,
+    plot_hotspots: true,
+  },
+};
+
+/**
+ * Display order + labels for the per-output toggle checkboxes shown in
+ * the Advanced section. Keeping this declarative makes the form trivial
+ * to extend when new toggles land on the backend.
+ */
+const TOGGLE_ROWS: Array<{ key: keyof OutputOverrides; label: string }> = [
+  { key: "generate_geojson", label: "Enriched GeoJSON" },
+  { key: "compute_stats", label: "Summary statistics" },
+  { key: "generate_chart", label: "Privacy pie chart" },
+  { key: "plot_zone_sensitivity", label: "Zone-sensitivity bar chart" },
+  { key: "plot_sensitivity_reasons", label: "Sensitivity-reasons bar chart" },
+  { key: "generate_heatmap", label: "Heatmap (HTML)" },
+  { key: "generate_hotspots", label: "Hotspots GeoJSON" },
+  { key: "plot_hotspots", label: "Hotspots scatter plot (PNG)" },
+];
 
 interface PipelineConfigProps {
   onStartScan: (request: PipelineRequest) => void;
@@ -33,6 +92,8 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
   const [city, setCity] = useState<string>("");
   const [country, setCountry] = useState<string>("");
   const [scenario, setScenario] = useState<Scenario>("basic");
+  const [overrides, setOverrides] = useState<OutputOverrides>({});
+  const [advancedOpen, setAdvancedOpen] = useState<boolean>(false);
   const [enableRouting, setEnableRouting] = useState<boolean>(false);
   const [startPoint, setStartPoint] = useState<{
     lat: number;
@@ -41,6 +102,89 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
   const [endPoint, setEndPoint] = useState<{ lat: number; lon: number } | null>(
     null,
   );
+
+  // Camera-filter state. All three constraints default to
+  // "off" so a user who never touches the filter section sends the
+  // pre-Issue-#6 request shape (no ``camera_filter`` key at all).
+  const [filterSensitiveOnly, setFilterSensitiveOnly] =
+    useState<boolean>(false);
+  const [filterOperators, setFilterOperators] = useState<string[]>([]);
+  const [filterSurveillanceTypes, setFilterSurveillanceTypes] = useState<
+    string[]
+  >([]);
+  // Auto-discovered option lists, sourced from the most recent enriched
+  // GeoJSON for this city. Empty arrays mean "no prior data" — the
+  // Autocompletes still accept free-text via ``freeSolo`` so the user
+  // can type values for a city they haven't scanned yet.
+  const [operatorOptions, setOperatorOptions] = useState<string[]>([]);
+  const [surveillanceTypeOptions, setSurveillanceTypeOptions] = useState<
+    string[]
+  >([]);
+
+  // Pre-populate option lists from the last completed task's enriched
+  // GeoJSON, only when the user has typed the same city. State updates
+  // happen exclusively inside the async IIFE (post-await) so the
+  // ``set-state-in-effect`` lint rule stays happy.
+  useEffect(() => {
+    if (!enableRouting) return;
+
+    // Resolve the city we'll fetch for (or null when the prior scan
+    // doesn't apply). Doing this work outside the IIFE keeps the
+    // async block focused on the fetch + setState pair.
+    const trimmedCity = city.trim();
+    let lastCity: string | null = null;
+    if (trimmedCity) {
+      const saved = localStorage.getItem("lastCompletedTask");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as { city?: string };
+          if (
+            parsed.city &&
+            parsed.city.toLowerCase() === trimmedCity.toLowerCase()
+          ) {
+            lastCity = parsed.city;
+          }
+        } catch {
+          // Malformed JSON is treated as "no prior task" — fall through
+          // to the free-text fallback below.
+        }
+      }
+    }
+
+    let cancelled = false;
+    (async () => {
+      if (!lastCity) {
+        if (!cancelled) {
+          setOperatorOptions([]);
+          setSurveillanceTypeOptions([]);
+        }
+        return;
+      }
+      try {
+        const blob = await getGeoJson(lastCity, true);
+        const text = await blob.text();
+        const fc = JSON.parse(text) as {
+          features?: { properties?: Record<string, unknown> }[];
+        };
+        if (cancelled) return;
+        const features = (fc.features ?? []) as Parameters<
+          typeof extractOperators
+        >[0];
+        setOperatorOptions(extractOperators(features));
+        setSurveillanceTypeOptions(extractSurveillanceTypes(features));
+      } catch {
+        // Free-text fallback per spec — no error surfaced. The user
+        // just sees the empty Autocomplete and can still type values.
+        if (!cancelled) {
+          setOperatorOptions([]);
+          setSurveillanceTypeOptions([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enableRouting, city]);
 
   // Helper for coordinate validation
   const isValidCoordinate = (
@@ -71,18 +215,83 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
         end_lat: endPoint.lat,
         end_lon: endPoint.lon,
       };
+
+      // Build camera_filter only when the user has actually narrowed the
+      // set. All-off ⇒ omit the key entirely so the request shape matches
+      // pre-Frontend-#5 / pre-Backend-#6 payloads exactly.
+      const hasFilter =
+        filterSensitiveOnly ||
+        filterOperators.length > 0 ||
+        filterSurveillanceTypes.length > 0;
+      if (hasFilter) {
+        const cameraFilter: CameraFilter = {};
+        if (filterSensitiveOnly) cameraFilter.sensitive_only = true;
+        if (filterOperators.length > 0)
+          cameraFilter.operators = filterOperators;
+        if (filterSurveillanceTypes.length > 0)
+          cameraFilter.surveillance_types = filterSurveillanceTypes;
+        routingConfig.camera_filter = cameraFilter;
+      }
     }
 
-    onStartScan({
+    const request: PipelineRequest = {
       city,
       country: country, // Send country as "" if empty, instead of undefined
       scenario,
       routing_config: routingConfig,
-    });
+    };
+    // Only attach overrides when at least one toggle diverges from the
+    // preset baseline. This keeps the request shape unchanged for users
+    // who never opened the Advanced section.
+    if (Object.keys(overrides).length > 0) {
+      request.overrides = overrides;
+    }
+    onStartScan(request);
   };
 
-  const handleScenarioChange = (event: SelectChangeEvent) => {
-    setScenario(event.target.value as Scenario);
+  /**
+   * Re-clicking the active preset clears the overrides bag (per the
+   * Frontend spec). Switching presets keeps the overrides — the user
+   * may want their ad-hoc tweaks layered onto the new baseline.
+   */
+  const handleScenarioChange = (
+    _event: React.MouseEvent<HTMLElement>,
+    next: Scenario | null,
+  ) => {
+    if (next === null) {
+      // Re-click on the active button: ignore (ToggleButtonGroup default)
+      // but also clear overrides so the user gets a clean preset.
+      setOverrides({});
+      return;
+    }
+    if (next === scenario) {
+      setOverrides({});
+      return;
+    }
+    setScenario(next);
+  };
+
+  const effectiveValue = (key: keyof OutputOverrides): boolean => {
+    const o = overrides[key];
+    return o !== undefined ? o : PRESET_DEFAULTS[scenario][key];
+  };
+
+  /**
+   * Flip a toggle. If the resulting value matches the preset baseline
+   * the override key is removed (cleaner state — `overrides` only
+   * carries divergences, never redundant agreements).
+   */
+  const handleToggleOverride = (key: keyof OutputOverrides) => {
+    const nextValue = !effectiveValue(key);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      if (nextValue === PRESET_DEFAULTS[scenario][key]) {
+        delete next[key];
+      } else {
+        next[key] = nextValue;
+      }
+      return next;
+    });
   };
 
   const handleMapPick = (
@@ -142,21 +351,80 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
       </FormControl>
 
       <FormControl fullWidth required margin="normal">
-        <InputLabel id="scenario-select-label">Scenario</InputLabel>
-        <Select
-          labelId="scenario-select-label"
-          id="scenario-select"
+        <Typography variant="subtitle2" className="mb-2">
+          Scenario
+        </Typography>
+        <ToggleButtonGroup
           value={scenario}
-          label="Scenario"
+          exclusive
           onChange={handleScenarioChange}
+          aria-label="Analysis scenario preset"
           fullWidth
         >
-          <MenuItem value="basic">Basic</MenuItem>
-          <MenuItem value="full">Full</MenuItem>
-          <MenuItem value="quick">Quick</MenuItem>
-          <MenuItem value="report">Report</MenuItem>
-          <MenuItem value="mapping">Mapping</MenuItem>
-        </Select>
+          <ToggleButton value="basic" aria-label="Basic preset">
+            Basic
+          </ToggleButton>
+          <ToggleButton value="full" aria-label="Full preset">
+            Full
+          </ToggleButton>
+        </ToggleButtonGroup>
+        <Typography variant="caption" className="block mt-1 text-gray-500">
+          {scenario === "basic"
+            ? "Enriched data + summary stats. No charts or maps."
+            : "Every output enabled: charts, heatmap, hotspots, and stats."}
+        </Typography>
+
+        <Button
+          variant="text"
+          size="small"
+          onClick={() => setAdvancedOpen((v) => !v)}
+          endIcon={advancedOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          className="self-start mt-2"
+        >
+          Advanced
+          {Object.keys(overrides).length > 0
+            ? ` (${Object.keys(overrides).length} override${
+                Object.keys(overrides).length === 1 ? "" : "s"
+              })`
+            : ""}
+        </Button>
+
+        <Collapse in={advancedOpen} unmountOnExit>
+          <Box className="p-3 mt-2 border rounded-md">
+            <Typography variant="caption" className="block mb-2 text-gray-500">
+              Overrides layer on top of the preset. Re-click the active preset
+              to clear all overrides.
+            </Typography>
+            <FormGroup>
+              {TOGGLE_ROWS.map(({ key, label }) => (
+                <FormControlLabel
+                  key={key}
+                  control={
+                    <Checkbox
+                      checked={effectiveValue(key)}
+                      onChange={() => handleToggleOverride(key)}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <span>
+                      {label}
+                      {overrides[key] !== undefined && (
+                        <Typography
+                          component="span"
+                          variant="caption"
+                          className="ml-2 text-amber-600"
+                        >
+                          (overridden)
+                        </Typography>
+                      )}
+                    </span>
+                  }
+                />
+              ))}
+            </FormGroup>
+          </Box>
+        </Collapse>
       </FormControl>
 
       <FormControlLabel
@@ -285,6 +553,75 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
               />
             </Grid>
           </Grid>
+
+          <Box className="p-3 mt-2 space-y-3 border rounded-md">
+            <Typography variant="subtitle2">
+              Camera filter (optional)
+            </Typography>
+            <Typography variant="caption" className="block text-gray-500">
+              Routes will minimise exposure to the selected cameras only. Leave
+              every field blank to consider every camera.
+            </Typography>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={filterSensitiveOnly}
+                  onChange={(e) => setFilterSensitiveOnly(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Score only sensitive cameras"
+            />
+
+            <Autocomplete
+              multiple
+              freeSolo
+              size="small"
+              options={operatorOptions}
+              value={filterOperators}
+              onChange={(_e, value) => setFilterOperators(value as string[])}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Operators"
+                  placeholder={
+                    filterOperators.length === 0 ? "All operators" : ""
+                  }
+                  helperText={
+                    operatorOptions.length === 0
+                      ? "Type values; no prior scan to suggest from."
+                      : `${operatorOptions.length} operator(s) seen in the last scan.`
+                  }
+                />
+              )}
+            />
+
+            <Autocomplete
+              multiple
+              freeSolo
+              size="small"
+              options={surveillanceTypeOptions}
+              value={filterSurveillanceTypes}
+              onChange={(_e, value) =>
+                setFilterSurveillanceTypes(value as string[])
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Surveillance types"
+                  placeholder={
+                    filterSurveillanceTypes.length === 0 ? "All types" : ""
+                  }
+                  helperText={
+                    surveillanceTypeOptions.length === 0
+                      ? "Type values; no prior scan to suggest from."
+                      : `${surveillanceTypeOptions.length} type(s) seen in the last scan.`
+                  }
+                />
+              )}
+            />
+          </Box>
 
           <Box className="flex items-center justify-center w-full mt-4 overflow-hidden border border-gray-300 rounded-md h-96">
             <MapPicker

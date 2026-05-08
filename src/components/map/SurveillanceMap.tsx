@@ -1,5 +1,5 @@
 // src/components/map/SurveillanceMap.tsx
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -9,6 +9,8 @@ import type {
   GeoJsonProperties,
   Geometry,
 } from "geojson";
+import type { MapCameraFilter } from "../../types/api";
+import { matchesMapCameraFilter } from "./cameraFilter";
 
 // Fix for default marker icons not showing up
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -23,11 +25,14 @@ L.Icon.Default.mergeOptions({
 
 interface SurveillanceMapProps {
   enrichedGeoJson: FeatureCollection<Geometry, GeoJsonProperties> | null;
+  filter?: MapCameraFilter;
   center?: L.LatLngExpression;
   zoom?: number;
 }
 
-// Component to recenter map when GeoJSON data changes
+// Recenter on initial dataset only — keyed on the unfiltered
+// FeatureCollection reference so filter toggles don't yank the
+// viewport back to the default extent.
 const RecenterAutomatically: React.FC<{
   geoJson: FeatureCollection<Geometry, GeoJsonProperties> | null;
 }> = ({ geoJson }) => {
@@ -45,6 +50,7 @@ const RecenterAutomatically: React.FC<{
 
 const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
   enrichedGeoJson,
+  filter,
   center = [0, 0], // Default center
   zoom = 2, // Default zoom
 }) => {
@@ -77,6 +83,32 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
     }
   };
 
+  // Apply the camera filter on the way to leaflet. We rebuild the
+  // GeoJSON layer (via ``key``) on filter change so the markers
+  // really disappear/reappear instead of relying on style hacks.
+  const { displayedGeoJson, layerKey } = useMemo(() => {
+    if (!enrichedGeoJson) {
+      return { displayedGeoJson: null, layerKey: "empty" };
+    }
+    if (!filter) {
+      return { displayedGeoJson: enrichedGeoJson, layerKey: "all" };
+    }
+    const features = enrichedGeoJson.features.filter((f) =>
+      matchesMapCameraFilter(f, filter),
+    );
+    const fc: FeatureCollection<Geometry, GeoJsonProperties> = {
+      type: "FeatureCollection",
+      features,
+    };
+    const sig = JSON.stringify({
+      ops: filter.operators,
+      pr: filter.privacy,
+      sn: filter.sensitivity,
+      n: features.length,
+    });
+    return { displayedGeoJson: fc, layerKey: sig };
+  }, [enrichedGeoJson, filter]);
+
   // Get initial center and zoom from GeoJSON if available
   const initialCenter: L.LatLngExpression = center;
   const initialZoom: number = zoom;
@@ -95,19 +127,17 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
         maxZoom={19}
       />
 
-      {enrichedGeoJson && (
-        <>
-          <GeoJSON
-            key="enriched-layer"
-            data={enrichedGeoJson}
-            onEachFeature={onEachEnrichedFeature}
-            pointToLayer={(_feature, latlng) => {
-              return L.marker(latlng, { icon: cameraIcon });
-            }}
-          />
-          <RecenterAutomatically geoJson={enrichedGeoJson} />
-        </>
+      {displayedGeoJson && (
+        <GeoJSON
+          key={layerKey}
+          data={displayedGeoJson}
+          onEachFeature={onEachEnrichedFeature}
+          pointToLayer={(_feature, latlng) => {
+            return L.marker(latlng, { icon: cameraIcon });
+          }}
+        />
       )}
+      {enrichedGeoJson && <RecenterAutomatically geoJson={enrichedGeoJson} />}
     </MapContainer>
   );
 };

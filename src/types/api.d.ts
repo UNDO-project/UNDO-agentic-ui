@@ -1,6 +1,6 @@
 // src/types/api.d.ts
 
-export type Scenario = "basic" | "full" | "quick" | "report" | "mapping";
+export type Scenario = "basic" | "full";
 export type TaskStatus =
   | "pending"
   | "running"
@@ -9,6 +9,17 @@ export type TaskStatus =
   | "cancelled";
 export type WebSocketMessageType = "progress" | "completed" | "error" | "log";
 
+/**
+ * Camera-set narrowing applied to routing exposure scoring.
+ * Every field is optional. Omit the whole object — or send an empty one
+ * — to consider every camera in the dataset.
+ */
+export interface CameraFilter {
+  sensitive_only?: boolean;
+  operators?: string[];
+  surveillance_types?: string[];
+}
+
 export interface RoutingConfig {
   city: string;
   country?: string;
@@ -16,13 +27,48 @@ export interface RoutingConfig {
   start_lon: number;
   end_lat: number;
   end_lon: number;
+  camera_filter?: CameraFilter;
+}
+
+/**
+ * Per-toggle overrides layered on top of the chosen scenario preset.
+ * Every field is optional; only set fields are merged into the backend's
+ * ``PipelineConfig``. An empty object keeps the preset baseline exactly.
+ */
+export interface OutputOverrides {
+  generate_geojson?: boolean;
+  compute_stats?: boolean;
+  generate_chart?: boolean;
+  generate_heatmap?: boolean;
+  generate_hotspots?: boolean;
+  plot_zone_sensitivity?: boolean;
+  plot_sensitivity_reasons?: boolean;
+  plot_hotspots?: boolean;
+}
+
+/**
+ * Client-side filter applied to enriched-camera features in the
+ * Camera Map tab (Frontend #3). Distinct from ``CameraFilter`` above
+ * which is the routing-payload shape mirroring the backend.
+ *
+ * - ``operators``: empty array means "all operators".
+ * - ``privacy``: each flag controls visibility of one bucket;
+ *   ``unknown`` covers features whose ``public`` is null/undefined.
+ * - ``sensitivity``: tri-state across ``sensitive`` boolean.
+ */
+export interface MapCameraFilter {
+  operators: string[];
+  privacy: { public: boolean; private: boolean; unknown: boolean };
+  sensitivity: "all" | "sensitive" | "non-sensitive";
 }
 
 export interface PipelineRequest {
   city: string;
   country?: string;
   scenario: Scenario;
+  overrides?: OutputOverrides;
   routing_config?: RoutingConfig;
+  force_refresh?: boolean;
 }
 
 export interface TaskResult {
@@ -35,6 +81,10 @@ export interface TaskResult {
     length_m: number;
     exposure_score: number;
     route_id?: string;
+    /** Cameras within the route buffer after any camera_filter was applied. */
+    camera_count_near_route?: number;
+    /** Total cameras considered post-filter (the "Y" in "X of Y considered"). */
+    camera_count_total?: number;
   };
   // Add other result fields as they become relevant
 }
