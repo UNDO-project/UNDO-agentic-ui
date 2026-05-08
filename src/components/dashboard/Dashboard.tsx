@@ -1,5 +1,5 @@
 // src/components/dashboard/Dashboard.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -22,6 +22,12 @@ import DownloadIcon from "@mui/icons-material/Download";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import SurveillanceMap from "../map/SurveillanceMap";
+import CameraFilterPanel from "../map/CameraFilterPanel";
+import {
+  DEFAULT_CAMERA_FILTER,
+  extractOperators,
+  matchesCameraFilter,
+} from "../map/cameraFilter";
 import StatsPanel from "./StatsPanel";
 import {
   getCityOutputs,
@@ -34,7 +40,7 @@ import {
 } from "../../api/outputs";
 import { getPipelineStatus } from "../../api/pipeline";
 import { useSnackbar } from "../../hooks/useSnackbar";
-import type { TaskResult, OutputFile } from "../../types/api";
+import type { CameraFilter, TaskResult, OutputFile } from "../../types/api";
 import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 
 interface DashboardProps {
@@ -78,6 +84,13 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
 
+  // Camera-map filter (Frontend #3). Pure client-side; resets on
+  // city change so a fresh dashboard never inherits the prior city's
+  // operator selection.
+  const [cameraFilter, setCameraFilter] = useState<CameraFilter>(
+    DEFAULT_CAMERA_FILTER,
+  );
+
   // Chart image URLs
   const [privacyChartUrl, setPrivacyChartUrl] = useState<string | null>(null);
   const [sensitivityChartUrl, setSensitivityChartUrl] = useState<string | null>(
@@ -105,6 +118,33 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [reportError, setReportError] = useState<string | null>(null);
 
   const { showSnackbar } = useSnackbar();
+
+  // Operator multi-select options come from the loaded GeoJSON, so
+  // they always reflect what's actually plotted. Memoised because
+  // ``enrichedGeoJson`` is stable per fetch.
+  const availableOperators = useMemo(
+    () => (enrichedGeoJson ? extractOperators(enrichedGeoJson.features) : []),
+    [enrichedGeoJson],
+  );
+
+  // The same predicate the map applies — we just count here so the
+  // panel caption stays in sync with what's drawn.
+  const visibleCameraCount = useMemo(() => {
+    if (!enrichedGeoJson) return 0;
+    return enrichedGeoJson.features.reduce(
+      (acc, f) => acc + (matchesCameraFilter(f, cameraFilter) ? 1 : 0),
+      0,
+    );
+  }, [enrichedGeoJson, cameraFilter]);
+
+  const totalCameraCount = enrichedGeoJson?.features.length ?? 0;
+
+  // Reset filter when the user navigates to a different city's
+  // dashboard so the operator selection from city A doesn't silently
+  // hide everything in city B.
+  useEffect(() => {
+    setCameraFilter(DEFAULT_CAMERA_FILTER);
+  }, [city]);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -473,7 +513,19 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Camera Map Tab */}
             <TabPanel value={activeTab} index={0}>
-              <SurveillanceMap enrichedGeoJson={enrichedGeoJson} />
+              <Box sx={{ px: 2 }}>
+                <CameraFilterPanel
+                  operators={availableOperators}
+                  filter={cameraFilter}
+                  onChange={setCameraFilter}
+                  visibleCount={visibleCameraCount}
+                  totalCount={totalCameraCount}
+                />
+              </Box>
+              <SurveillanceMap
+                enrichedGeoJson={enrichedGeoJson}
+                filter={cameraFilter}
+              />
             </TabPanel>
 
             {/* Heatmap Tab */}
