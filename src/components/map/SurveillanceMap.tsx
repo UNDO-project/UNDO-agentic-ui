@@ -9,8 +9,8 @@ import type {
   GeoJsonProperties,
   Geometry,
 } from "geojson";
-import type { CameraFilter } from "../../types/api";
-import { matchesCameraFilter } from "./cameraFilter";
+import type { MapCameraFilter } from "../../types/api";
+import { matchesMapCameraFilter } from "./cameraFilter";
 
 // Fix for default marker icons not showing up
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -25,7 +25,7 @@ L.Icon.Default.mergeOptions({
 
 interface SurveillanceMapProps {
   enrichedGeoJson: FeatureCollection<Geometry, GeoJsonProperties> | null;
-  filter?: CameraFilter;
+  filter?: MapCameraFilter;
   center?: L.LatLngExpression;
   zoom?: number;
 }
@@ -94,7 +94,7 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
       return { displayedGeoJson: enrichedGeoJson, layerKey: "all" };
     }
     const features = enrichedGeoJson.features.filter((f) =>
-      matchesCameraFilter(f, filter),
+      matchesMapCameraFilter(f, filter),
     );
     const fc: FeatureCollection<Geometry, GeoJsonProperties> = {
       type: "FeatureCollection",
