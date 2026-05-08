@@ -1,5 +1,5 @@
 // src/components/form/PipelineConfig.tsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   TextField,
   FormControl,
@@ -14,6 +14,7 @@ import {
   Collapse,
   ToggleButton,
   ToggleButtonGroup,
+  Autocomplete,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
@@ -22,8 +23,14 @@ import type {
   PipelineRequest,
   RoutingConfig,
   OutputOverrides,
+  CameraFilter,
 } from "../../types/api";
 import MapPicker from "../map/MapPicker"; // Uncommented MapPicker import
+import { getGeoJson } from "../../api/outputs";
+import {
+  extractOperators,
+  extractSurveillanceTypes,
+} from "../map/cameraFilter";
 
 /**
  * Effective output toggle values for each scenario preset. Mirrors the
@@ -96,6 +103,89 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
     null,
   );
 
+  // Camera-filter state. All three constraints default to
+  // "off" so a user who never touches the filter section sends the
+  // pre-Issue-#6 request shape (no ``camera_filter`` key at all).
+  const [filterSensitiveOnly, setFilterSensitiveOnly] =
+    useState<boolean>(false);
+  const [filterOperators, setFilterOperators] = useState<string[]>([]);
+  const [filterSurveillanceTypes, setFilterSurveillanceTypes] = useState<
+    string[]
+  >([]);
+  // Auto-discovered option lists, sourced from the most recent enriched
+  // GeoJSON for this city. Empty arrays mean "no prior data" — the
+  // Autocompletes still accept free-text via ``freeSolo`` so the user
+  // can type values for a city they haven't scanned yet.
+  const [operatorOptions, setOperatorOptions] = useState<string[]>([]);
+  const [surveillanceTypeOptions, setSurveillanceTypeOptions] = useState<
+    string[]
+  >([]);
+
+  // Pre-populate option lists from the last completed task's enriched
+  // GeoJSON, only when the user has typed the same city. State updates
+  // happen exclusively inside the async IIFE (post-await) so the
+  // ``set-state-in-effect`` lint rule stays happy.
+  useEffect(() => {
+    if (!enableRouting) return;
+
+    // Resolve the city we'll fetch for (or null when the prior scan
+    // doesn't apply). Doing this work outside the IIFE keeps the
+    // async block focused on the fetch + setState pair.
+    const trimmedCity = city.trim();
+    let lastCity: string | null = null;
+    if (trimmedCity) {
+      const saved = localStorage.getItem("lastCompletedTask");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as { city?: string };
+          if (
+            parsed.city &&
+            parsed.city.toLowerCase() === trimmedCity.toLowerCase()
+          ) {
+            lastCity = parsed.city;
+          }
+        } catch {
+          // Malformed JSON is treated as "no prior task" — fall through
+          // to the free-text fallback below.
+        }
+      }
+    }
+
+    let cancelled = false;
+    (async () => {
+      if (!lastCity) {
+        if (!cancelled) {
+          setOperatorOptions([]);
+          setSurveillanceTypeOptions([]);
+        }
+        return;
+      }
+      try {
+        const blob = await getGeoJson(lastCity, true);
+        const text = await blob.text();
+        const fc = JSON.parse(text) as {
+          features?: { properties?: Record<string, unknown> }[];
+        };
+        if (cancelled) return;
+        const features = (fc.features ?? []) as Parameters<
+          typeof extractOperators
+        >[0];
+        setOperatorOptions(extractOperators(features));
+        setSurveillanceTypeOptions(extractSurveillanceTypes(features));
+      } catch {
+        // Free-text fallback per spec — no error surfaced. The user
+        // just sees the empty Autocomplete and can still type values.
+        if (!cancelled) {
+          setOperatorOptions([]);
+          setSurveillanceTypeOptions([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enableRouting, city]);
+
   // Helper for coordinate validation
   const isValidCoordinate = (
     lat: number | undefined,
@@ -125,6 +215,23 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
         end_lat: endPoint.lat,
         end_lon: endPoint.lon,
       };
+
+      // Build camera_filter only when the user has actually narrowed the
+      // set. All-off ⇒ omit the key entirely so the request shape matches
+      // pre-Frontend-#5 / pre-Backend-#6 payloads exactly.
+      const hasFilter =
+        filterSensitiveOnly ||
+        filterOperators.length > 0 ||
+        filterSurveillanceTypes.length > 0;
+      if (hasFilter) {
+        const cameraFilter: CameraFilter = {};
+        if (filterSensitiveOnly) cameraFilter.sensitive_only = true;
+        if (filterOperators.length > 0)
+          cameraFilter.operators = filterOperators;
+        if (filterSurveillanceTypes.length > 0)
+          cameraFilter.surveillance_types = filterSurveillanceTypes;
+        routingConfig.camera_filter = cameraFilter;
+      }
     }
 
     const request: PipelineRequest = {
@@ -144,7 +251,7 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
 
   /**
    * Re-clicking the active preset clears the overrides bag (per the
-   * Frontend #1 spec). Switching presets keeps the overrides — the user
+   * Frontend spec). Switching presets keeps the overrides — the user
    * may want their ad-hoc tweaks layered onto the new baseline.
    */
   const handleScenarioChange = (
@@ -272,7 +379,7 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
           size="small"
           onClick={() => setAdvancedOpen((v) => !v)}
           endIcon={advancedOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-          className="mt-2 self-start"
+          className="self-start mt-2"
         >
           Advanced
           {Object.keys(overrides).length > 0
@@ -446,6 +553,75 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
               />
             </Grid>
           </Grid>
+
+          <Box className="p-3 mt-2 space-y-3 border rounded-md">
+            <Typography variant="subtitle2">
+              Camera filter (optional)
+            </Typography>
+            <Typography variant="caption" className="block text-gray-500">
+              Routes will minimise exposure to the selected cameras only. Leave
+              every field blank to consider every camera.
+            </Typography>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={filterSensitiveOnly}
+                  onChange={(e) => setFilterSensitiveOnly(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Score only sensitive cameras"
+            />
+
+            <Autocomplete
+              multiple
+              freeSolo
+              size="small"
+              options={operatorOptions}
+              value={filterOperators}
+              onChange={(_e, value) => setFilterOperators(value as string[])}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Operators"
+                  placeholder={
+                    filterOperators.length === 0 ? "All operators" : ""
+                  }
+                  helperText={
+                    operatorOptions.length === 0
+                      ? "Type values; no prior scan to suggest from."
+                      : `${operatorOptions.length} operator(s) seen in the last scan.`
+                  }
+                />
+              )}
+            />
+
+            <Autocomplete
+              multiple
+              freeSolo
+              size="small"
+              options={surveillanceTypeOptions}
+              value={filterSurveillanceTypes}
+              onChange={(_e, value) =>
+                setFilterSurveillanceTypes(value as string[])
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Surveillance types"
+                  placeholder={
+                    filterSurveillanceTypes.length === 0 ? "All types" : ""
+                  }
+                  helperText={
+                    surveillanceTypeOptions.length === 0
+                      ? "Type values; no prior scan to suggest from."
+                      : `${surveillanceTypeOptions.length} type(s) seen in the last scan.`
+                  }
+                />
+              )}
+            />
+          </Box>
 
           <Box className="flex items-center justify-center w-full mt-4 overflow-hidden border border-gray-300 rounded-md h-96">
             <MapPicker
