@@ -34,6 +34,23 @@ export interface OutputOverrides {
   plot_hotspots?: boolean;
 }
 
+/**
+ * Client-side filter applied to enriched-camera features in the
+ * Camera Map tab. The shape mirrors the data the analyzer already
+ * writes into the GeoJSON properties — no backend change needed to
+ * support it.
+ *
+ * - ``operators``: empty array means "all operators".
+ * - ``privacy``: each flag controls visibility of one bucket;
+ *   ``unknown`` covers features whose ``public`` is null/undefined.
+ * - ``sensitivity``: tri-state across ``sensitive`` boolean.
+ */
+export interface CameraFilter {
+  operators: string[];
+  privacy: { public: boolean; private: boolean; unknown: boolean };
+  sensitivity: "all" | "sensitive" | "non-sensitive";
+}
+
 export interface PipelineRequest {
   city: string;
   country?: string;
