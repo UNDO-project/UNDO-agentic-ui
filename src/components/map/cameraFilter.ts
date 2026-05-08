@@ -7,9 +7,9 @@
 // toggle.
 
 import type { Feature, GeoJsonProperties, Geometry } from "geojson";
-import type { CameraFilter } from "../../types/api";
+import type { MapCameraFilter } from "../../types/api";
 
-export const DEFAULT_CAMERA_FILTER: CameraFilter = {
+export const DEFAULT_CAMERA_FILTER: MapCameraFilter = {
   operators: [],
   privacy: { public: true, private: true, unknown: true },
   sensitivity: "all",
@@ -21,9 +21,9 @@ export const DEFAULT_CAMERA_FILTER: CameraFilter = {
  * privacy bucket is determined by the ``public`` boolean (true /
  * false / null|undefined → unknown).
  */
-export function matchesCameraFilter(
+export function matchesMapCameraFilter(
   feature: Feature<Geometry, GeoJsonProperties>,
-  filter: CameraFilter,
+  filter: MapCameraFilter,
 ): boolean {
   const props = feature.properties ?? {};
 
@@ -54,10 +54,29 @@ export function matchesCameraFilter(
 export function extractOperators(
   features: Feature<Geometry, GeoJsonProperties>[],
 ): string[] {
+  return extractStringProperty(features, "operator");
+}
+
+/**
+ * Distinct, sorted list of ``surveillance_type`` strings present in the
+ * loaded GeoJSON. Used by the routing-form camera filter selector
+ * (Frontend #5) so the user picks from values the analyzer actually
+ * produced for this city.
+ */
+export function extractSurveillanceTypes(
+  features: Feature<Geometry, GeoJsonProperties>[],
+): string[] {
+  return extractStringProperty(features, "surveillance_type");
+}
+
+function extractStringProperty(
+  features: Feature<Geometry, GeoJsonProperties>[],
+  key: string,
+): string[] {
   const seen = new Set<string>();
   for (const f of features) {
-    const op = f.properties?.operator;
-    if (typeof op === "string" && op.length > 0) seen.add(op);
+    const v = f.properties?.[key];
+    if (typeof v === "string" && v.length > 0) seen.add(v);
   }
   return Array.from(seen).sort((a, b) => a.localeCompare(b));
 }
