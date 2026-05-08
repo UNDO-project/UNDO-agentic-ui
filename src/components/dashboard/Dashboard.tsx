@@ -70,6 +70,36 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+/**
+ * Friendly fallback for tabs whose underlying artifact 404s. Replaces
+ * the iframe / image so the user never sees a raw FastAPI error body
+ * (``{"detail":"File not found"}``) or a broken-image icon.
+ */
+const ArtifactMissingPlaceholder: React.FC<{
+  label: string;
+  hint?: string;
+}> = ({ label, hint }) => (
+  <Box
+    sx={{
+      p: 4,
+      height: 600,
+      textAlign: "center",
+      color: "text.secondary",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+    }}
+  >
+    <Typography variant="body1">{label}</Typography>
+    {hint && (
+      <Typography variant="caption" sx={{ display: "block", mt: 1 }}>
+        {hint}
+      </Typography>
+    )}
+  </Box>
+);
+
 const Dashboard: React.FC<DashboardProps> = ({
   taskId,
   city,
@@ -91,7 +121,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     DEFAULT_CAMERA_FILTER,
   );
 
-  // Chart image URLs
+  // Chart image URLs. Each is ``null`` until the file is fetched
+  // (or stays ``null`` permanently when the artifact is absent — see
+  // ``chartFiles`` below for the per-panel presence check).
   const [privacyChartUrl, setPrivacyChartUrl] = useState<string | null>(null);
   const [sensitivityChartUrl, setSensitivityChartUrl] = useState<string | null>(
     null,
@@ -101,6 +133,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     string | null
   >(null);
   const [timelineChartUrl, setTimelineChartUrl] = useState<string | null>(null);
+  const [zoneSensitivityChartUrl, setZoneSensitivityChartUrl] = useState<
+    string | null
+  >(null);
   const [chartsLoading, setChartsLoading] = useState(false);
   const [chartsError, setChartsError] = useState<string | null>(null);
 
@@ -138,6 +173,35 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [enrichedGeoJson, cameraFilter]);
 
   const totalCameraCount = enrichedGeoJson?.features.length ?? 0;
+
+  // Per-chart filename presence, derived from the city's outputs list.
+  // Drives both the fetch gating (we never issue a 404 for a file the
+  // backend didn't write — Backend HF#4) and the panel rendering
+  // (file absent ⇒ captioned empty state instead of broken image).
+  const chartFiles = useMemo(() => {
+    const findFile = (substr: string): string | undefined =>
+      outputFiles.find((f) => f.name.toLowerCase().includes(substr))?.name;
+    return {
+      privacy: findFile("_privacy."),
+      sensitivity: findFile("sensitivity_reasons"),
+      operator: findFile("operator_distribution"),
+      manufacturer: findFile("manufacturer_distribution"),
+      timeline: findFile("install_timeline"),
+      zoneSensitivity: findFile("zone_sensitivity"),
+    };
+  }, [outputFiles]);
+
+  // Iframe-panel availability is derived, not probed: the backend
+  // route is GET-only so a HEAD probe would return 405 and falsely
+  // declare the artifact missing. Using the data we already have
+  // (the outputs list for heatmap; the routing-result flag for route)
+  // also avoids an extra HTTP request.
+  const heatmapAvailable = useMemo(
+    () =>
+      outputFiles.some((f) => f.name.toLowerCase().endsWith("_heatmap.html")),
+    [outputFiles],
+  );
+  const routeAvailable = routeUrl !== null;
 
   // Reset filter when the user navigates to a different city's
   // dashboard so the operator selection from city A doesn't silently
@@ -223,74 +287,94 @@ const Dashboard: React.FC<DashboardProps> = ({
   // their filenames carry the city stem and the dedicated endpoint
   // wasn't extended to know about them.
   const fetchCharts = useCallback(async () => {
-    if (
-      privacyChartUrl &&
-      sensitivityChartUrl &&
-      operatorChartUrl &&
-      manufacturerChartUrl &&
-      timelineChartUrl
-    )
-      return; // Already loaded
+    // "Already loaded" means every chart whose file actually exists
+    // has been fetched. A chart whose file is genuinely absent (e.g.
+    // manufacturer when OSM has no data — Backend HF#4) is treated
+    // as loaded too, otherwise this guard would never fire and the
+    // tab-load effect would re-trigger the fetch on every render
+    // (causing the Statistics tab to flicker).
+    const allLoaded =
+      (!chartFiles.privacy || privacyChartUrl !== null) &&
+      (!chartFiles.sensitivity || sensitivityChartUrl !== null) &&
+      (!chartFiles.operator || operatorChartUrl !== null) &&
+      (!chartFiles.manufacturer || manufacturerChartUrl !== null) &&
+      (!chartFiles.timeline || timelineChartUrl !== null) &&
+      (!chartFiles.zoneSensitivity || zoneSensitivityChartUrl !== null);
+    if (allLoaded) return;
 
     setChartsLoading(true);
     setChartsError(null);
 
-    // Filename discovery from the file list keeps the lookup tolerant of
-    // backend case conventions (the analyzer lowercases the city stem).
-    const findFile = (substr: string): string | undefined =>
-      outputFiles.find((f) => f.name.toLowerCase().includes(substr))?.name;
+    // Every fetch is gated on the file's presence in the outputs list
+    // so we never issue a 404 for a chart the backend didn't write
+    // (Backend HF#4). Privacy/sensitivity continue to use their
+    // dedicated routes; the others use direct file downloads (their
+    // filenames are discoverable but not exposed via a route).
+    const fetches: Array<{
+      key:
+        | "privacy"
+        | "sensitivity"
+        | "operator"
+        | "manufacturer"
+        | "timeline"
+        | "zoneSensitivity";
+      promise: Promise<Blob> | null;
+    }> = [
+      {
+        key: "privacy",
+        promise: chartFiles.privacy ? getChart(city, "privacy") : null,
+      },
+      {
+        key: "sensitivity",
+        promise: chartFiles.sensitivity ? getChart(city, "sensitivity") : null,
+      },
+      {
+        key: "operator",
+        promise: chartFiles.operator
+          ? downloadFile(chartFiles.operator, city)
+          : null,
+      },
+      {
+        key: "manufacturer",
+        promise: chartFiles.manufacturer
+          ? downloadFile(chartFiles.manufacturer, city)
+          : null,
+      },
+      {
+        key: "timeline",
+        promise: chartFiles.timeline
+          ? downloadFile(chartFiles.timeline, city)
+          : null,
+      },
+      {
+        key: "zoneSensitivity",
+        promise: chartFiles.zoneSensitivity
+          ? downloadFile(chartFiles.zoneSensitivity, city)
+          : null,
+      },
+    ];
 
-    const operatorFile = findFile("operator_distribution");
-    const manufacturerFile = findFile("manufacturer_distribution");
-    const timelineFile = findFile("install_timeline");
+    const setters: Record<
+      (typeof fetches)[number]["key"],
+      (url: string) => void
+    > = {
+      privacy: setPrivacyChartUrl,
+      sensitivity: setSensitivityChartUrl,
+      operator: setOperatorChartUrl,
+      manufacturer: setManufacturerChartUrl,
+      timeline: setTimelineChartUrl,
+      zoneSensitivity: setZoneSensitivityChartUrl,
+    };
 
     try {
-      const [
-        privacyResult,
-        sensitivityResult,
-        operatorResult,
-        manufacturerResult,
-        timelineResult,
-      ] = await Promise.allSettled([
-        getChart(city, "privacy"),
-        getChart(city, "sensitivity"),
-        operatorFile
-          ? downloadFile(operatorFile, city)
-          : Promise.reject(new Error("operator chart not generated")),
-        manufacturerFile
-          ? downloadFile(manufacturerFile, city)
-          : Promise.reject(new Error("manufacturer chart not generated")),
-        timelineFile
-          ? downloadFile(timelineFile, city)
-          : Promise.reject(new Error("timeline chart not generated")),
-      ]);
-
-      if (privacyResult.status === "fulfilled") {
-        setPrivacyChartUrl(URL.createObjectURL(privacyResult.value));
-      }
-      if (sensitivityResult.status === "fulfilled") {
-        setSensitivityChartUrl(URL.createObjectURL(sensitivityResult.value));
-      }
-      if (operatorResult.status === "fulfilled") {
-        setOperatorChartUrl(URL.createObjectURL(operatorResult.value));
-      }
-      if (manufacturerResult.status === "fulfilled") {
-        setManufacturerChartUrl(URL.createObjectURL(manufacturerResult.value));
-      }
-      if (timelineResult.status === "fulfilled") {
-        setTimelineChartUrl(URL.createObjectURL(timelineResult.value));
-      }
-
-      const allRejected = [
-        privacyResult,
-        sensitivityResult,
-        operatorResult,
-        manufacturerResult,
-        timelineResult,
-      ].every((r) => r.status === "rejected");
-      if (allRejected) {
-        setChartsError("Charts not available for this analysis.");
-      }
+      const results = await Promise.allSettled(
+        fetches.map((f) => f.promise ?? Promise.reject(new Error("absent"))),
+      );
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") {
+          setters[fetches[i].key](URL.createObjectURL(r.value));
+        }
+      });
     } catch (err) {
       console.error("Failed to fetch charts:", err);
       setChartsError("Failed to load charts.");
@@ -299,12 +383,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   }, [
     city,
-    outputFiles,
+    chartFiles,
     privacyChartUrl,
     sensitivityChartUrl,
     operatorChartUrl,
     manufacturerChartUrl,
     timelineChartUrl,
+    zoneSensitivityChartUrl,
   ]);
 
   useEffect(() => {
@@ -351,6 +436,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (operatorChartUrl) URL.revokeObjectURL(operatorChartUrl);
       if (manufacturerChartUrl) URL.revokeObjectURL(manufacturerChartUrl);
       if (timelineChartUrl) URL.revokeObjectURL(timelineChartUrl);
+      if (zoneSensitivityChartUrl) URL.revokeObjectURL(zoneSensitivityChartUrl);
     };
   }, [
     hotspotsUrl,
@@ -359,6 +445,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     operatorChartUrl,
     manufacturerChartUrl,
     timelineChartUrl,
+    zoneSensitivityChartUrl,
   ]);
 
   const handleDownload = useCallback(
@@ -537,15 +624,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                   bgcolor: "background.default",
                 }}
               >
-                <iframe
-                  src={getHeatmapUrl(city)}
-                  title="Surveillance Heatmap"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    border: "none",
-                  }}
-                />
+                {heatmapAvailable ? (
+                  <iframe
+                    src={getHeatmapUrl(city)}
+                    title="Surveillance Heatmap"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      border: "none",
+                    }}
+                  />
+                ) : (
+                  <ArtifactMissingPlaceholder
+                    label="Heatmap not available for this run."
+                    hint="Re-run with the Heatmap toggle enabled to generate it."
+                  />
+                )}
               </Box>
             </TabPanel>
 
@@ -625,116 +719,106 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 {!chartsLoading && !chartsError && (
                   <Grid container spacing={3}>
-                    {privacyChartUrl && (
-                      <Grid size={{ xs: 12, lg: 6 }}>
+                    {(
+                      [
+                        {
+                          title: "Privacy Analysis",
+                          alt: "Privacy Analysis Chart",
+                          fileName: chartFiles.privacy,
+                          url: privacyChartUrl,
+                          emptyHint:
+                            "Re-run with the privacy chart toggle enabled.",
+                        },
+                        {
+                          title: "Sensitivity Analysis",
+                          alt: "Sensitivity Analysis Chart",
+                          fileName: chartFiles.sensitivity,
+                          url: sensitivityChartUrl,
+                          emptyHint:
+                            "Re-run with the sensitivity-reasons chart toggle enabled.",
+                        },
+                        {
+                          title: "Zone Sensitivity",
+                          alt: "Zone Sensitivity Chart",
+                          fileName: chartFiles.zoneSensitivity,
+                          url: zoneSensitivityChartUrl,
+                          emptyHint:
+                            "Re-run with the zone-sensitivity chart toggle enabled.",
+                        },
+                        {
+                          title: "Operator Distribution",
+                          alt: "Operator Distribution Chart",
+                          fileName: chartFiles.operator,
+                          url: operatorChartUrl,
+                          emptyHint:
+                            "OSM tags for these cameras don't carry an operator field, or the toggle is off.",
+                        },
+                        {
+                          title: "Manufacturer Distribution",
+                          alt: "Manufacturer Distribution Chart",
+                          fileName: chartFiles.manufacturer,
+                          url: manufacturerChartUrl,
+                          emptyHint:
+                            "OSM tags for these cameras don't carry a manufacturer field.",
+                        },
+                        {
+                          title: "Install Timeline",
+                          alt: "Install Timeline Chart",
+                          fileName: chartFiles.timeline,
+                          url: timelineChartUrl,
+                          emptyHint:
+                            "No install-year data available — OSM tags lack ``start_date``.",
+                        },
+                      ] as const
+                    ).map((panel) => (
+                      <Grid key={panel.title} size={{ xs: 12, lg: 6 }}>
                         <Box sx={{ textAlign: "center" }}>
                           <Typography
                             variant="subtitle1"
                             sx={{ mb: 1, fontWeight: 600 }}
                           >
-                            Privacy Analysis
+                            {panel.title}
                           </Typography>
-                          <img
-                            src={privacyChartUrl}
-                            alt="Privacy Analysis Chart"
-                            style={{
-                              maxWidth: "100%",
-                              height: "auto",
-                              borderRadius: 4,
-                            }}
-                          />
+                          {panel.fileName && panel.url ? (
+                            <img
+                              src={panel.url}
+                              alt={panel.alt}
+                              style={{
+                                maxWidth: "100%",
+                                height: "auto",
+                                borderRadius: 4,
+                              }}
+                            />
+                          ) : (
+                            <Box
+                              sx={{
+                                p: 4,
+                                color: "text.secondary",
+                                border: "1px dashed",
+                                borderColor: "divider",
+                                borderRadius: 1,
+                              }}
+                            >
+                              <Typography variant="body2">
+                                Not available for this run.
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                sx={{ display: "block", mt: 0.5 }}
+                              >
+                                {panel.emptyHint}
+                              </Typography>
+                            </Box>
+                          )}
                         </Box>
                       </Grid>
-                    )}
-                    {sensitivityChartUrl && (
-                      <Grid size={{ xs: 12, lg: 6 }}>
-                        <Box sx={{ textAlign: "center" }}>
-                          <Typography
-                            variant="subtitle1"
-                            sx={{ mb: 1, fontWeight: 600 }}
-                          >
-                            Sensitivity Analysis
-                          </Typography>
-                          <img
-                            src={sensitivityChartUrl}
-                            alt="Sensitivity Analysis Chart"
-                            style={{
-                              maxWidth: "100%",
-                              height: "auto",
-                              borderRadius: 4,
-                            }}
-                          />
-                        </Box>
-                      </Grid>
-                    )}
-                    {operatorChartUrl && (
-                      <Grid size={{ xs: 12, lg: 6 }}>
-                        <Box sx={{ textAlign: "center" }}>
-                          <Typography
-                            variant="subtitle1"
-                            sx={{ mb: 1, fontWeight: 600 }}
-                          >
-                            Operator Distribution
-                          </Typography>
-                          <img
-                            src={operatorChartUrl}
-                            alt="Operator Distribution Chart"
-                            style={{
-                              maxWidth: "100%",
-                              height: "auto",
-                              borderRadius: 4,
-                            }}
-                          />
-                        </Box>
-                      </Grid>
-                    )}
-                    {manufacturerChartUrl && (
-                      <Grid size={{ xs: 12, lg: 6 }}>
-                        <Box sx={{ textAlign: "center" }}>
-                          <Typography
-                            variant="subtitle1"
-                            sx={{ mb: 1, fontWeight: 600 }}
-                          >
-                            Manufacturer Distribution
-                          </Typography>
-                          <img
-                            src={manufacturerChartUrl}
-                            alt="Manufacturer Distribution Chart"
-                            style={{
-                              maxWidth: "100%",
-                              height: "auto",
-                              borderRadius: 4,
-                            }}
-                          />
-                        </Box>
-                      </Grid>
-                    )}
-                    {timelineChartUrl && (
-                      <Grid size={{ xs: 12, lg: 6 }}>
-                        <Box sx={{ textAlign: "center" }}>
-                          <Typography
-                            variant="subtitle1"
-                            sx={{ mb: 1, fontWeight: 600 }}
-                          >
-                            Install Timeline
-                          </Typography>
-                          <img
-                            src={timelineChartUrl}
-                            alt="Install Timeline Chart"
-                            style={{
-                              maxWidth: "100%",
-                              height: "auto",
-                              borderRadius: 4,
-                            }}
-                          />
-                        </Box>
-                      </Grid>
-                    )}
-                    {!privacyChartUrl &&
-                      !sensitivityChartUrl &&
-                      !operatorChartUrl &&
-                      !manufacturerChartUrl &&
-                      !timelineChartUrl && (
+                    ))}
+                    {!chartFiles.privacy &&
+                      !chartFiles.sensitivity &&
+                      !chartFiles.zoneSensitivity &&
+                      !chartFiles.operator &&
+                      !chartFiles.manufacturer &&
+                      !chartFiles.timeline && (
                         <Grid size={{ xs: 12 }}>
                           <Box
                             sx={{
@@ -860,15 +944,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                     bgcolor: "background.default",
                   }}
                 >
-                  <iframe
-                    src={routeUrl!}
-                    title="Privacy-Preserving Route"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      border: "none",
-                    }}
-                  />
+                  {routeAvailable ? (
+                    <iframe
+                      src={routeUrl!}
+                      title="Privacy-Preserving Route"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        border: "none",
+                      }}
+                    />
+                  ) : (
+                    <ArtifactMissingPlaceholder
+                      label="Route map not available."
+                      hint="The route artifact may have been cleaned up — re-run routing to regenerate it."
+                    />
+                  )}
                 </Box>
               </TabPanel>
             )}

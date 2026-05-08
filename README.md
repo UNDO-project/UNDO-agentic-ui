@@ -1,84 +1,88 @@
-# Agentic Surveillance Research Frontend
+# Agentic Surveillance Research — Frontend
 
-## Overview
+A React + TypeScript dashboard for the
+[Agentic Surveillance Research](../agentic-surveillance-research) FastAPI
+service. Configure a city scan, watch the pipeline run, and explore the
+enriched results — camera map, heatmap, hotspots, charts, an LLM
+report, and an optional low-surveillance walking route.
 
-This application acts as a specialized navigation tool designed to help understand and visualize surveillance levels in a city.
+## Features
 
-- Download data for surveillance cameras in a city.
-- See a map with all cameras
-- See the density of cameras through a heatmat
-- Check out charts about the operation of the cameras
-- See a walkable **less "surveilled route"** between a start and a destination
+- **Configurable scan** — pick a city, choose a `basic` or `full` preset,
+  toggle individual outputs (heatmap, hotspots, charts, report) and
+  optionally add a routing request with start/end coordinates and a
+  per-camera filter (operator / surveillance type / sensitive-only).
+- **Live progress** — polling-based progress bar with per-stage status
+  and elapsed-time / staleness indicators.
+- **Dashboard tabs**:
+  - **Camera Map** — Leaflet markers with an operator / privacy /
+    sensitivity filter pane.
+  - **Heatmap** — folium HTML embedded as an iframe.
+  - **Hotspots** — DBSCAN clusters as a PNG.
+  - **Statistics** — privacy, sensitivity, zone-sensitivity, operator,
+    manufacturer, and install-timeline charts (each with a captioned
+    empty state when the underlying data is missing).
+  - **Report** — markdown city report rendered with `react-markdown`.
+  - **Route** _(optional)_ — folium map of the chosen low-surveillance
+    walking route.
+- **Last-results recall** — completed scans persist in `localStorage`
+  so the dashboard reopens at a click.
 
-**Key Features:**
+## Stack
 
-- **City Scanning:** Select a city to scan for known surveillance camera locations using public data.
-- **Route Planning:** Choose a starting point and a destination. The app calculates a path that avoids cameras where possible.
-- **Visual Dashboard:** See the results on an interactive map. Cameras are marked, "risky" areas are highlighted, and safe paths are clearly drawn.
-- **Real-time Monitoring:** Watch the system as it gathers data and processes your request in real-time.
+React 19 · TypeScript 5.9 · Vite 7 · MUI 7 · Tailwind 4 ·
+Leaflet / react-leaflet · axios · react-markdown.
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- **Node.js**: Ensure you have Node.js installed (v18 or higher is recommended).
-- **npm**: The Node Package Manager is required to install dependencies.
+- Node.js ≥ 18
+- A running backend at `http://127.0.0.1:8080`. See the
+  [agentic-surveillance-research](../agentic-surveillance-research)
+  README for how to start it (`bash start_uvicorn_dev.sh`).
 
-### Installation
-
-1.  Clone this repository to your local machine.
+### Install & run
 
 ```bash
 git clone git@github.com:jethronap/UNDO-agentic-ui.git
-```
-
-2.  Navigate to the project folder.
-
-```bash
-cd UNDO-agentic-ui/
-```
-
-3.  Install the necessary dependencies:
-
-```bash
+cd UNDO-agentic-ui
 npm install
-```
-
-### Running the Application
-
-To start the local development server:
-
-```bash
 npm run dev
 ```
 
-Once started, open your browser and navigate to the URL provided in the terminal (usually `http://localhost:5173`).
+Open the URL Vite prints (default `http://localhost:5173`).
 
-## Development Workflow
+The dev server proxies `/api/*` to `127.0.0.1:8080` (see
+`vite.config.ts`), so the frontend works against any backend on that
+port without further configuration.
 
-We use a suite of tools to ensure code quality and consistency.
-
-### Linting & Formatting
-
-- **ESLint:** We use ESLint to catch errors and enforce coding standards.
-  - To run the linter manually: `npm run lint`
-- **Prettier:** We use Prettier for automatic code formatting.
-
-### Git Hooks (Husky)
-
-This project is configured with **Husky** to handle Git hooks. This helps automate quality checks before code is committed.
-
-- **Pre-commit Hook:** When you run `git commit`, a tool called `lint-staged` is automatically triggered.
-  - It checks **only the files you are about to commit**.
-  - It automatically runs **ESLint** (to fix simple errors) and **Prettier** (to format code).
-  - If there are errors that cannot be fixed automatically, the commit will fail, and you will need to fix them before trying again.
-
-### Building for Production
-
-To create a production-ready build of the application:
+### Build
 
 ```bash
-npm run build
+npm run build       # tsc -b && vite build → dist/
+npm run preview     # serve the production build locally
 ```
 
-This will compile the TypeScript code and assets into the `dist/` directory, ready for deployment.
+## Project layout
+
+```
+src/
+├── api/              # axios client, /pipeline and /outputs wrappers
+├── components/
+│   ├── form/         # PipelineConfig — scan + routing form
+│   ├── monitor/      # ProgressMonitor + PipelineStepper
+│   ├── dashboard/    # Dashboard, StatsPanel
+│   ├── map/          # SurveillanceMap, CameraFilterPanel, MapPicker
+│   └── ScanWorkflow  # top-level config → monitor → dashboard router
+├── hooks/            # useSnackbar, useWebSocket
+└── types/api.d.ts    # request / response shapes mirroring the backend
+```
+
+## Development workflow
+
+- **Lint** — `npm run lint` (ESLint + `typescript-eslint`).
+- **Format** — Prettier; runs automatically via `lint-staged` on commit.
+- **Pre-commit hook** — Husky runs `lint-staged`, which lints + formats
+  staged files. A failed lint blocks the commit; fix and retry.
+- **Type-check only** — `npx tsc -b`.
