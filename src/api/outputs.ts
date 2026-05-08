@@ -70,9 +70,14 @@ export const getCityReport = async (city: string): Promise<string> => {
   return response.data;
 };
 
-// Get the hotspots plot PNG image
+// Get the hotspots plot PNG image. Uses the dedicated ``/map`` route
+// (Backend HF#5: serves ``<city>_hotspots.png``) so a future filename
+// change on the backend is a one-line route edit, not a coordinated
+// frontend release.
 export const getHotspotsPlot = async (city: string): Promise<Blob> => {
-  // Hotspots are generated as PNG files: {city}_enriched_hotspots.png
-  const filename = `${city}_enriched_hotspots.png`;
-  return downloadFile(filename, city);
+  const response = await api.get(`/outputs/${city}/map`, {
+    params: { map_type: "hotspots" },
+    responseType: "blob",
+  });
+  return response.data;
 };
