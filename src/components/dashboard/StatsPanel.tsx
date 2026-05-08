@@ -106,7 +106,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
               Additional Downloads:
             </Typography>
             <Box className="flex flex-wrap gap-2">
-              {outputFiles.slice(0, 3).map((file) => {
+              {outputFiles.map((file) => {
                 const fileExt = file.name.split(".").pop() || "";
                 const baseName = file.name
                   .replace(`${city}_`, "")
