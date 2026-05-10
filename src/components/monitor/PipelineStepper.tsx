@@ -24,6 +24,7 @@ const steps = [
 interface PipelineStepperProps {
   currentStage: string;
   routingEnabled?: boolean; // Whether routing is part of this pipeline
+  isComplete?: boolean; // Whether the pipeline has finished successfully
 }
 
 // Custom Step Icon to show spinning animation for active step
@@ -72,6 +73,7 @@ function CustomStepIcon(props: StepIconProps) {
 const PipelineStepper: React.FC<PipelineStepperProps> = ({
   currentStage,
   routingEnabled = true,
+  isComplete = false,
 }) => {
   // Helper to map backend stage strings to step index
   const getActiveStep = (stage: string) => {
@@ -100,14 +102,19 @@ const PipelineStepper: React.FC<PipelineStepperProps> = ({
     return 0;
   };
 
-  const activeStep = getActiveStep(currentStage);
+  // When the run is complete, push activeStep past the last index so MUI
+  // marks every step (including "Completion") as done. Without this the
+  // final step stays "active" and renders the spinner instead of a tick.
+  const activeStep = isComplete ? steps.length : getActiveStep(currentStage);
 
   return (
     <Box sx={{ width: "100%", mb: 4 }}>
       <Stepper activeStep={activeStep} alternativeLabel>
         {steps.map((label) => {
-          // Skip routing step if not enabled
-          if (label === "Routing" && !routingEnabled) {
+          // Skip routing step if not enabled (and not after completion —
+          // once done, the uniform tick row reads better than a "Skipped"
+          // caption).
+          if (label === "Routing" && !routingEnabled && !isComplete) {
             return (
               <Step key={label}>
                 <StepLabel
