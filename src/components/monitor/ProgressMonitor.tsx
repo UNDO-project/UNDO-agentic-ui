@@ -296,6 +296,7 @@ const ProgressMonitor: React.FC<ProgressMonitorProps> = ({
         <PipelineStepper
           currentStage={currentStage}
           routingEnabled={routingEnabled}
+          isComplete={isComplete}
         />
 
         {elementsCount !== null && (

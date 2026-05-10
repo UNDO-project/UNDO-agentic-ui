@@ -16,108 +16,138 @@ import PsychologyIcon from "@mui/icons-material/Psychology";
 import RouteIcon from "@mui/icons-material/Route";
 import SecurityIcon from "@mui/icons-material/Security";
 import SpeedIcon from "@mui/icons-material/Speed";
-import MapIcon from "@mui/icons-material/Map";
 import AssessmentIcon from "@mui/icons-material/Assessment";
-import DescriptionIcon from "@mui/icons-material/Description";
+import CachedIcon from "@mui/icons-material/Cached";
 
 const pipelineSteps = [
   {
     label: "Configure Your Scan",
     agent: null,
+    optional: false,
     description:
       "Enter the city and country you want to analyze. Choose an analysis scenario based on your needs. Optionally enable route computation and select start/end points on the map.",
   },
   {
     label: "Data Collection",
     agent: "Scraper Agent",
+    optional: false,
     description:
       "The Scraper Agent queries OpenStreetMap via the Overpass API to download surveillance camera locations and relevant geographic data. Results are cached to avoid redundant requests.",
   },
   {
     label: "Analysis & Enrichment",
     agent: "Analyzer Agent",
+    optional: false,
     description:
-      "The Analyzer Agent processes camera data using a local LLM (no external API calls). It enriches locations with context, estimates coverage areas, categorizes by type, and generates visualizations including heatmaps and hotspot clusters.",
+      "The Analyzer Agent processes camera data using a local LLM (no external API calls). It enriches each camera with context, clusters hotspots with DBSCAN, renders heatmaps and statistical charts, and — when the scenario asks for it — produces an LLM-written city report.",
   },
   {
     label: "Route Computation",
     agent: "Route Finder Agent",
+    optional: true,
     description:
-      "If enabled, the Route Finder Agent computes privacy-preserving walking routes using k-shortest paths algorithms. Routes are scored by camera exposure (cameras per kilometer) and compared against the shortest path baseline.",
+      "Runs only when start and end coordinates are supplied in the scan form. The Route Finder Agent builds (or reuses) an OSMnx pedestrian graph, generates k candidate paths, and scores each by the number of cameras within the configured buffer radius. The result is compared against the shortest-path baseline so the privacy gain is explicit.",
   },
   {
     label: "Results & Visualization",
     agent: null,
+    optional: false,
     description:
-      "View results on an interactive map with camera markers and computed routes. Download GeoJSON files, heatmaps, and statistical charts. All outputs are stored locally for your privacy.",
+      "View results on an interactive map with camera markers and computed routes. Browse statistical charts and the city report. Download GeoJSON, heatmap HTML, and chart PNGs. All outputs are stored locally for your privacy.",
   },
 ];
 
 const scenarios = [
   {
     name: "basic",
-    description: "Essential analysis with key output files",
+    description:
+      "Enriched GeoJSON + statistics. No charts, heatmap, hotspots, or report — the fastest end-to-end run.",
     icon: <SpeedIcon />,
     recommended: true,
   },
   {
     name: "full",
-    description: "Complete analysis with all visualizations and reports",
+    description:
+      "Every output toggle on: heatmap, hotspots, all six stat charts, and the LLM-written city report.",
     icon: <AssessmentIcon />,
-    recommended: false,
-  },
-  {
-    name: "quick",
-    description: "Fast analysis with minimal processing",
-    icon: <SpeedIcon />,
-    recommended: false,
-  },
-  {
-    name: "report",
-    description: "Focus on statistical summaries and charts",
-    icon: <DescriptionIcon />,
-    recommended: false,
-  },
-  {
-    name: "mapping",
-    description: "Emphasis on geospatial visualizations",
-    icon: <MapIcon />,
     recommended: false,
   },
 ];
 
 const routingFeatures = [
   "K-shortest paths algorithm evaluates multiple candidate routes",
-  "Exposure scoring counts cameras within 50m buffer radius",
+  "Exposure scoring counts cameras within the configured buffer radius",
   "Baseline comparison shows privacy gain vs. shortest path",
   "Interactive maps display route with camera coverage circles",
   "Graph caching enables fast re-computation for same city",
 ];
 
-const outputFiles = [
+const outputGroups: {
+  title: string;
+  files: { name: string; description: string }[];
+}[] = [
   {
-    name: "Enriched GeoJSON",
-    description: "Camera locations with LLM-analyzed metadata",
+    title: "Geospatial",
+    files: [
+      {
+        name: "Enriched GeoJSON",
+        description: "Camera locations with LLM-analyzed metadata",
+      },
+      {
+        name: "Heatmap",
+        description: "Interactive HTML showing surveillance density",
+      },
+      {
+        name: "Hotspots",
+        description: "DBSCAN clustering of high-density camera areas",
+      },
+      {
+        name: "Route GeoJSON",
+        description: "Route geometry with exposure metrics (when routing runs)",
+      },
+      {
+        name: "Route Map",
+        description: "Interactive map with route and camera coverage",
+      },
+    ],
   },
   {
-    name: "Heatmap",
-    description: "Interactive HTML showing surveillance density",
+    title: "Statistics",
+    files: [
+      {
+        name: "Privacy distribution",
+        description: "Public vs. private camera split",
+      },
+      {
+        name: "Sensitivity reasons",
+        description: "Why each camera was flagged sensitive",
+      },
+      {
+        name: "Operator distribution",
+        description: "Top operators in the area",
+      },
+      {
+        name: "Manufacturer distribution",
+        description: "Top manufacturer tags in OSM",
+      },
+      {
+        name: "Install timeline",
+        description: "Cameras grouped by install year",
+      },
+      {
+        name: "Zone sensitivity",
+        description: "Sensitivity scoring per zone",
+      },
+    ],
   },
   {
-    name: "Hotspots",
-    description: "DBSCAN clustering of high-density camera areas",
-  },
-  {
-    name: "Route GeoJSON",
-    description: "Route geometry with exposure metrics",
-  },
-  {
-    name: "Route Map",
-    description: "Interactive map with route and camera coverage",
-  },
-  {
-    name: "Statistics",
-    description: "Charts and metrics for surveillance analysis",
+    title: "Narrative",
+    files: [
+      {
+        name: "City Report",
+        description: "LLM-written Markdown summary of the analysis",
+      },
+    ],
   },
 ];
 
@@ -161,9 +191,10 @@ function HowItWorksPage() {
       </Box>
 
       <Grid container spacing={4}>
-        {/* Pipeline Steps */}
-        <Grid size={{ xs: 12, lg: 7 }}>
-          <Paper sx={{ p: 4, bgcolor: "background.paper", height: "100%" }}>
+        {/* Pipeline Steps — full width so the vertical stepper has room
+            without pushing the right column into a thin strip */}
+        <Grid size={{ xs: 12 }}>
+          <Paper sx={{ p: 4, bgcolor: "background.paper" }}>
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
               Pipeline Steps
             </Typography>
@@ -172,9 +203,27 @@ function HowItWorksPage() {
                 <Step key={step.label} active expanded>
                   <StepLabel>
                     <Box>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {step.label}
-                      </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {step.label}
+                        </Typography>
+                        {step.optional && (
+                          <Chip
+                            label="optional"
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ height: 20, fontSize: "0.7rem" }}
+                          />
+                        )}
+                      </Box>
                       {step.agent && (
                         <Chip
                           label={step.agent}
@@ -210,13 +259,24 @@ function HowItWorksPage() {
           </Paper>
         </Grid>
 
-        {/* Right Column */}
-        <Grid size={{ xs: 12, lg: 5 }}>
+        {/* Supporting cards — two columns on lg, single column on smaller
+            viewports. Pairing: Scenarios + Routing on the left, Caching +
+            Outputs on the right (Outputs is the tallest, paired with the
+            smallest). */}
+        <Grid size={{ xs: 12, md: 6 }}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             {/* Analysis Scenarios */}
             <Paper sx={{ p: 3, bgcolor: "background.paper" }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
                 Analysis Scenarios
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ color: "text.secondary", mb: 2 }}
+              >
+                Two presets cover the common cases. The scan form lets you
+                override individual outputs (heatmap, hotspots, individual
+                charts, report) on top of either preset.
               </Typography>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                 {scenarios.map((scenario) => (
@@ -293,6 +353,37 @@ function HowItWorksPage() {
                 ))}
               </Box>
             </Paper>
+          </Box>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {/* Caching */}
+            <Paper sx={{ p: 3, bgcolor: "background.paper" }}>
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}
+              >
+                <CachedIcon sx={{ color: "primary.main" }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Caching
+                </Typography>
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{ color: "text.secondary", mb: 1 }}
+              >
+                Re-running the same scenario reuses prior work instead of
+                regenerating it: scrape results are keyed by city, enrichment is
+                keyed by camera set, and each rendered artifact carries a{" "}
+                <code>.cache.json</code> sidecar that lets the pipeline skip
+                expensive renders when inputs are unchanged.
+              </Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Distributions that have nothing to render (e.g. a city whose OSM
+                data has no manufacturer tags) are skipped rather than emitted
+                as empty placeholders.
+              </Typography>
+            </Paper>
 
             {/* Output Files */}
             <Paper sx={{ p: 3, bgcolor: "background.paper" }}>
@@ -300,21 +391,33 @@ function HowItWorksPage() {
                 Generated Outputs
               </Typography>
               <Divider sx={{ mb: 2 }} />
-              <Grid container spacing={1}>
-                {outputFiles.map((file) => (
-                  <Grid size={{ xs: 6 }} key={file.name}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {file.name}
-                    </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+                {outputGroups.map((group) => (
+                  <Box key={group.title}>
                     <Typography
-                      variant="caption"
+                      variant="overline"
                       sx={{ color: "text.secondary" }}
                     >
-                      {file.description}
+                      {group.title}
                     </Typography>
-                  </Grid>
+                    <Grid container spacing={1} sx={{ mt: 0.5 }}>
+                      {group.files.map((file) => (
+                        <Grid size={{ xs: 6 }} key={file.name}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {file.name}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{ color: "text.secondary" }}
+                          >
+                            {file.description}
+                          </Typography>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
             </Paper>
           </Box>
         </Grid>
