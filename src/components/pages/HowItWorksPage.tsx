@@ -18,6 +18,7 @@ import SecurityIcon from "@mui/icons-material/Security";
 import SpeedIcon from "@mui/icons-material/Speed";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import CachedIcon from "@mui/icons-material/Cached";
+import LayersIcon from "@mui/icons-material/Layers";
 
 const pipelineSteps = [
   {
@@ -39,7 +40,7 @@ const pipelineSteps = [
     agent: "Analyzer Agent",
     optional: false,
     description:
-      "The Analyzer Agent processes camera data using a local LLM (no external API calls). It enriches each camera with context, clusters hotspots with DBSCAN, renders heatmaps and statistical charts, and — when the scenario asks for it — produces an LLM-written city report.",
+      "The Analyzer Agent processes camera data using a local LLM (no external API calls). It enriches each camera with context and runs a four-layer hotspot stack: a planar KDE density surface for the smooth heatmap, an HDBSCAN polygon clustering of dense pockets, a Getis-Ord Gi* hex grid for statistical hot/cold classification, and a cameras-per-road-km headline metric for cross-city comparison. Statistical charts and an LLM-written city report follow when the scenario asks for them.",
   },
   {
     label: "Route Computation",
@@ -98,8 +99,21 @@ const outputGroups: {
         description: "Interactive HTML showing surveillance density",
       },
       {
-        name: "Hotspots",
-        description: "DBSCAN clustering of high-density camera areas",
+        name: "KDE density contours",
+        description:
+          "Planar kernel-density polygons at the 50/75/90/95 percentiles",
+      },
+      {
+        name: "Gi* hex grid",
+        description: "Getis-Ord Gi* hot/cold hexes with FDR-adjusted p-values",
+      },
+      {
+        name: "HDBSCAN polygons",
+        description: "Density-based cluster hulls with persistence scores",
+      },
+      {
+        name: "Density metrics",
+        description: "Headline cameras-per-road-km + cameras-per-km² (JSON)",
       },
       {
         name: "Route GeoJSON",
@@ -382,6 +396,68 @@ function HowItWorksPage() {
                 Distributions that have nothing to render (e.g. a city whose OSM
                 data has no manufacturer tags) are skipped rather than emitted
                 as empty placeholders.
+              </Typography>
+            </Paper>
+
+            {/* Hotspot methodology. Four complementary layers,
+                each answering a different question. Sits next to Caching
+                because it's the other "what the pipeline actually does"
+                explainer — Outputs below lists the artifact files. */}
+            <Paper sx={{ p: 3, bgcolor: "background.paper" }}>
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}
+              >
+                <LayersIcon sx={{ color: "primary.main" }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Hotspot methodology
+                </Typography>
+              </Box>
+              <Box
+                component="ul"
+                sx={{
+                  m: 0,
+                  pl: 2,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 0.75,
+                }}
+              >
+                <Box component="li">
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    <strong>KDE density</strong> — a smooth surface of camera
+                    density evaluated on a metric grid; the heatmap is derived
+                    from it rather than from raw points.
+                  </Typography>
+                </Box>
+                <Box component="li">
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    <strong>HDBSCAN polygons</strong> — density-based cluster
+                    hulls that adapt their bandwidth locally, so dense downtown
+                    blocks don't fuse with sparse suburbs.
+                  </Typography>
+                </Box>
+                <Box component="li">
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    <strong>Gi* hex grid</strong> — Getis-Ord Gi* with
+                    FDR-adjusted p-values, classifying each hex as statistically
+                    hot, cold, or not significant.
+                  </Typography>
+                </Box>
+                <Box component="li">
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    <strong>Cameras per road-km</strong> — a single citable
+                    headline figure that normalises by the pedestrian network
+                    humans actually use.
+                  </Typography>
+                </Box>
+              </Box>
+              <Typography
+                variant="caption"
+                sx={{ display: "block", color: "text.secondary", mt: 1.5 }}
+              >
+                Method references: Amnesty International,{" "}
+                <em>Decode Surveillance NYC</em>; Stanford RegLab,{" "}
+                <em>Surveilling Surveillance</em> (2021).
               </Typography>
             </Paper>
 

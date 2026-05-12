@@ -69,17 +69,21 @@ function AboutPage() {
         <Typography variant="body1" paragraph sx={{ color: "text.secondary" }}>
           The Agentic Surveillance Research System is a multi-agent pipeline for
           analyzing the surveillance infrastructure of cities and, when asked,
-          computing pedestrian routes that minimize exposure to it.
+          computing pedestrian routes that minimize exposure to it. Surveillance
+          density is reported as a citable cameras-per-road-km headline figure,
+          plus three independent map layers — a KDE density surface, an HDBSCAN
+          cluster polygon set, and a Getis-Ord Gi* statistical hex grid — that
+          users can toggle on top of the camera map.
         </Typography>
         <Typography variant="body1" paragraph sx={{ color: "text.secondary" }}>
           A <strong>Scraper Agent</strong> pulls camera locations from
           OpenStreetMap via the Overpass API. An <strong>Analyzer Agent</strong>{" "}
-          enriches each camera with a local LLM (LangChain on top of Ollama),
-          clusters hotspots with DBSCAN, and renders heatmaps, statistical
-          charts, and an LLM-written city report. When start and end coordinates
-          are supplied, a <strong>Route Finder Agent</strong> builds an OSMnx
-          pedestrian graph, runs k-shortest paths, and scores each candidate by
-          the number of cameras within a configurable buffer.
+          enriches each camera with a local LLM (LangChain on top of Ollama) and
+          runs the four-layer hotspot stack alongside statistical charts and an
+          LLM-written city report. When start and end coordinates are supplied,
+          a <strong>Route Finder Agent</strong> builds an OSMnx pedestrian
+          graph, runs k-shortest paths, and scores each candidate by the number
+          of cameras within a configurable buffer.
         </Typography>
       </Paper>
 
