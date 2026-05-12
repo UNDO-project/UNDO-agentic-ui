@@ -41,6 +41,7 @@ import {
   initialHotspotLayerState,
   type HotspotLayerState,
 } from "../map/layers/hotspotLayerState";
+import DensityMetricsCallout from "./stats/DensityMetricsCallout";
 import { getPipelineStatus } from "../../api/pipeline";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import type { MapCameraFilter, TaskResult, OutputFile } from "../../types/api";
@@ -629,6 +630,13 @@ const Dashboard: React.FC<DashboardProps> = ({
             {/* Statistics Tab */}
             <TabPanel value={activeTab} index={2}>
               <Box sx={{ p: 2 }}>
+                {/* Headline cameras-per-road-km callout. Sits
+                    above the chart grid so the eye lands on the
+                    citable cross-city number first; the component
+                    owns its own fetch lifecycle and silently degrades
+                    to a captioned placeholder on 404. */}
+                <DensityMetricsCallout city={city} />
+
                 {chartsLoading && (
                   <Box className="flex flex-col gap-4">
                     <Skeleton variant="rectangular" height={300} />
