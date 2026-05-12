@@ -1,5 +1,6 @@
 // src/api/outputs.ts
 import api from "./axios";
+import type { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import type { CityOutputsResponse } from "../types/api";
 
 export const getCityOutputs = async (
@@ -81,3 +82,50 @@ export const getHotspotsPlot = async (city: string): Promise<Blob> => {
   });
   return response.data;
 };
+
+//
+// Each layer is shipped as its own GeoJSON artifact by the backend.
+// The frontend layer-toggle in the dashboard map fetches them
+// lazily on first activation. Returning a parsed ``FeatureCollection``
+// (rather than a Blob) saves every layer component from re-parsing the
+// payload and keeps the cache key surface narrow — same fetch helper
+// in cache, same parsed object out.
+//
+// All four routes 404 cleanly when the underlying file is absent for
+// this run (BASIC scenario, missing toggle, OSM had no data, etc.).
+// Callers should treat the 404 as "layer not generated" and not as an
+// error — see the helpers' usage in HotspotLayerControl.
+
+export type HotspotFeatureCollection = FeatureCollection<
+  Geometry,
+  GeoJsonProperties
+>;
+
+/** Internal: tiny wrapper so the four named endpoints share one body. */
+async function fetchHotspotGeoJson(
+  city: string,
+  leaf: string,
+): Promise<HotspotFeatureCollection> {
+  const response = await api.get<HotspotFeatureCollection>(
+    `/outputs/${city}/${leaf}`,
+  );
+  return response.data;
+}
+
+/** KDE density contours, 50/75/90/95 percentile bands. */
+export const getDensityGeoJson = (
+  city: string,
+): Promise<HotspotFeatureCollection> =>
+  fetchHotspotGeoJson(city, "density.geojson");
+
+/** Getis-Ord Gi* hex grid with z-scores + FDR-adjusted classification. */
+export const getGiStarGeoJson = (
+  city: string,
+): Promise<HotspotFeatureCollection> =>
+  fetchHotspotGeoJson(city, "gi_star.geojson");
+
+/** HDBSCAN convex-hull polygons + cluster metadata. */
+export const getHotspotPolygonsGeoJson = (
+  city: string,
+): Promise<HotspotFeatureCollection> =>
+  fetchHotspotGeoJson(city, "hotspot_polygons.geojson");
