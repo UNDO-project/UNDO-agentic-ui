@@ -5,7 +5,7 @@ import Paper from "@mui/material/Paper";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 
-const FRONTEND_VERSION = import.meta.env.VITE_APP_VERSION ?? "0.4.1";
+const FRONTEND_VERSION = import.meta.env.VITE_APP_VERSION ?? "0.5.0";
 
 const technologies = [
   "React",
