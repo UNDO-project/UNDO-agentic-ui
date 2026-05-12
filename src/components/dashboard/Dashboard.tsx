@@ -14,7 +14,6 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import MapIcon from "@mui/icons-material/Map";
 import WhatshotIcon from "@mui/icons-material/Whatshot";
-import BubbleChartIcon from "@mui/icons-material/BubbleChart";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import RouteIcon from "@mui/icons-material/Route";
 import DescriptionIcon from "@mui/icons-material/Description";
@@ -35,9 +34,13 @@ import {
   downloadFile,
   getChart,
   getHeatmapUrl,
-  getHotspotsPlot,
   getCityReport,
 } from "../../api/outputs";
+import HotspotLayerControl from "../map/layers/HotspotLayerControl";
+import {
+  initialHotspotLayerState,
+  type HotspotLayerState,
+} from "../map/layers/hotspotLayerState";
 import { getPipelineStatus } from "../../api/pipeline";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import type { MapCameraFilter, TaskResult, OutputFile } from "../../types/api";
@@ -139,10 +142,13 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [chartsLoading, setChartsLoading] = useState(false);
   const [chartsError, setChartsError] = useState<string | null>(null);
 
-  // Hotspots image
-  const [hotspotsUrl, setHotspotsUrl] = useState<string | null>(null);
-  const [hotspotsLoading, setHotspotsLoading] = useState(false);
-  const [hotspotsError, setHotspotsError] = useState<string | null>(null);
+  // Hotspot overlay state lives at the dashboard level so each tab
+  // switch back to the Camera Map preserves the toggles + their
+  // cached GeoJSON. ``cacheKey`` flips on every fresh run so a re-run
+  // for the same city refetches rather than serving stale layers.
+  const [hotspotLayers, setHotspotLayers] = useState<HotspotLayerState>(
+    initialHotspotLayerState(),
+  );
 
   // Route URL
   const [routeUrl, setRouteUrl] = useState<string | null>(null);
@@ -240,25 +246,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       setLoading(false);
     }
   }, [taskId, city, showSnackbar]);
-
-  // Fetch hotspots plot when Hotspots tab is selected
-  const fetchHotspots = useCallback(async () => {
-    if (hotspotsUrl) return; // Already loaded
-
-    setHotspotsLoading(true);
-    setHotspotsError(null);
-
-    try {
-      const blob = await getHotspotsPlot(city);
-      const url = URL.createObjectURL(blob);
-      setHotspotsUrl(url);
-    } catch (err) {
-      console.error("Failed to fetch hotspots plot:", err);
-      setHotspotsError("Hotspots plot not available for this analysis.");
-    } finally {
-      setHotspotsLoading(false);
-    }
-  }, [city, hotspotsUrl]);
 
   // Fetch the LLM-generated city report when the Report tab is selected.
   // Lazy because the dashboard mounts on every revisit; we only pay the
@@ -396,16 +383,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Load hotspots when tab 2 (Hotspots) is selected
+  // Load charts when tab 2 (Statistics) is selected. The standalone
+  // Hotspots tab (which showed the old DBSCAN PNG) was removed in
+  // F-HSR#1 — the interactive layer-toggle on the Camera Map replaces
+  // it, so tab indices shifted down by one.
   useEffect(() => {
     if (activeTab === 2) {
-      fetchHotspots();
-    }
-  }, [activeTab, fetchHotspots]);
-
-  // Load charts when tab 3 (Statistics) is selected
-  useEffect(() => {
-    if (activeTab === 3) {
       fetchCharts();
     }
   }, [activeTab, fetchCharts]);
@@ -422,7 +405,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   // ``hasReport`` so we don't fire a useless 404 when the tab isn't
   // even visible.
   useEffect(() => {
-    if (activeTab === 4 && hasReport) {
+    if (activeTab === 3 && hasReport) {
       fetchReport();
     }
   }, [activeTab, fetchReport, hasReport]);
@@ -430,7 +413,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   // Cleanup blob URLs on unmount
   useEffect(() => {
     return () => {
-      if (hotspotsUrl) URL.revokeObjectURL(hotspotsUrl);
       if (privacyChartUrl) URL.revokeObjectURL(privacyChartUrl);
       if (sensitivityChartUrl) URL.revokeObjectURL(sensitivityChartUrl);
       if (operatorChartUrl) URL.revokeObjectURL(operatorChartUrl);
@@ -439,7 +421,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (zoneSensitivityChartUrl) URL.revokeObjectURL(zoneSensitivityChartUrl);
     };
   }, [
-    hotspotsUrl,
     privacyChartUrl,
     sensitivityChartUrl,
     operatorChartUrl,
@@ -566,34 +547,27 @@ const Dashboard: React.FC<DashboardProps> = ({
               />
               <Tab
                 value={2}
-                icon={<BubbleChartIcon />}
-                label="Hotspots"
+                icon={<BarChartIcon />}
+                label="Statistics"
                 id="dashboard-tab-2"
                 aria-controls="dashboard-tabpanel-2"
               />
-              <Tab
-                value={3}
-                icon={<BarChartIcon />}
-                label="Statistics"
-                id="dashboard-tab-3"
-                aria-controls="dashboard-tabpanel-3"
-              />
               {hasReport && (
                 <Tab
-                  value={4}
+                  value={3}
                   icon={<DescriptionIcon />}
                   label="Report"
-                  id="dashboard-tab-4"
-                  aria-controls="dashboard-tabpanel-4"
+                  id="dashboard-tab-3"
+                  aria-controls="dashboard-tabpanel-3"
                 />
               )}
               {hasRoute && (
                 <Tab
-                  value={5}
+                  value={4}
                   icon={<RouteIcon />}
                   label="Route"
-                  id="dashboard-tab-5"
-                  aria-controls="dashboard-tabpanel-5"
+                  id="dashboard-tab-4"
+                  aria-controls="dashboard-tabpanel-4"
                 />
               )}
             </Tabs>
@@ -612,6 +586,15 @@ const Dashboard: React.FC<DashboardProps> = ({
               <SurveillanceMap
                 enrichedGeoJson={enrichedGeoJson}
                 filter={cameraFilter}
+                hotspotLayers={hotspotLayers}
+                controlsOverlay={
+                  <HotspotLayerControl
+                    city={city}
+                    cacheKey={taskId}
+                    state={hotspotLayers}
+                    onChange={setHotspotLayers}
+                  />
+                }
               />
             </TabPanel>
 
@@ -643,56 +626,8 @@ const Dashboard: React.FC<DashboardProps> = ({
               </Box>
             </TabPanel>
 
-            {/* Hotspots Tab */}
-            <TabPanel value={activeTab} index={2}>
-              <Box
-                sx={{
-                  minHeight: 400,
-                  width: "100%",
-                  p: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {hotspotsLoading && (
-                  <Skeleton variant="rectangular" height={400} width="100%" />
-                )}
-
-                {hotspotsError && !hotspotsLoading && (
-                  <Box sx={{ textAlign: "center", color: "text.secondary" }}>
-                    <Typography variant="body1">{hotspotsError}</Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      Try running a &quot;full&quot; or &quot;mapping&quot;
-                      scenario to generate the hotspots plot.
-                    </Typography>
-                  </Box>
-                )}
-
-                {hotspotsUrl && !hotspotsLoading && (
-                  <Box sx={{ textAlign: "center", width: "100%" }}>
-                    <Typography
-                      variant="subtitle1"
-                      sx={{ mb: 2, fontWeight: 600 }}
-                    >
-                      Camera Hotspots (DBSCAN Clustering)
-                    </Typography>
-                    <img
-                      src={hotspotsUrl}
-                      alt="Surveillance Hotspots Plot"
-                      style={{
-                        maxWidth: "100%",
-                        height: "auto",
-                        borderRadius: 4,
-                      }}
-                    />
-                  </Box>
-                )}
-              </Box>
-            </TabPanel>
-
             {/* Statistics Tab */}
-            <TabPanel value={activeTab} index={3}>
+            <TabPanel value={activeTab} index={2}>
               <Box sx={{ p: 2 }}>
                 {chartsLoading && (
                   <Box className="flex flex-col gap-4">
@@ -845,7 +780,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Report Tab (conditional) */}
             {hasReport && (
-              <TabPanel value={activeTab} index={4}>
+              <TabPanel value={activeTab} index={3}>
                 <Box sx={{ p: 2 }}>
                   <Box
                     sx={{
@@ -936,7 +871,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Route Tab (conditional) */}
             {hasRoute && (
-              <TabPanel value={activeTab} index={5}>
+              <TabPanel value={activeTab} index={4}>
                 <Box
                   sx={{
                     height: 600,
