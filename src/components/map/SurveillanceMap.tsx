@@ -3,6 +3,7 @@ import React, { useEffect, useMemo } from "react";
 import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { Box } from "@mui/material";
 import type {
   Feature,
   FeatureCollection,
@@ -11,6 +12,11 @@ import type {
 } from "geojson";
 import type { MapCameraFilter } from "../../types/api";
 import { matchesMapCameraFilter } from "./cameraFilter";
+import KDEContourLayer from "./layers/KDEContourLayer";
+import GiStarHexLayer from "./layers/GiStarHexLayer";
+import HDBSCANPolygonLayer from "./layers/HDBSCANPolygonLayer";
+import HotspotLegends from "./layers/HotspotLegend";
+import type { HotspotLayerState } from "./layers/hotspotLayerState";
 
 // Fix for default marker icons not showing up
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -28,6 +34,23 @@ interface SurveillanceMapProps {
   filter?: MapCameraFilter;
   center?: L.LatLngExpression;
   zoom?: number;
+  /**
+   * Optional hotspot overlay state. When present, the corresponding
+   * GeoJSON layers are rendered as siblings of the camera markers and
+   * each enabled layer also flips on its inline legend in the
+   * bottom-left corner. The map fits its own bounds via the camera
+   * GeoJSON — hotspot layers don't trigger a recenter, so toggling a
+   * hex grid on a city the user is panned into doesn't yank the
+   * viewport back.
+   */
+  hotspotLayers?: HotspotLayerState;
+  /**
+   * Optional child rendered as a sibling of the MapContainer, used by
+   * the dashboard to mount the floating HotspotLayerControl panel
+   * over the map. Kept generic so additional floating controls can
+   * be added without re-threading more props.
+   */
+  controlsOverlay?: React.ReactNode;
 }
 
 // Recenter on initial dataset only — keyed on the unfiltered
@@ -53,6 +76,8 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
   filter,
   center = [0, 0], // Default center
   zoom = 2, // Default zoom
+  hotspotLayers,
+  controlsOverlay,
 }) => {
   // Custom camera icon
   const cameraIcon = L.icon({
@@ -113,32 +138,64 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
   const initialCenter: L.LatLngExpression = center;
   const initialZoom: number = zoom;
 
-  return (
-    <MapContainer
-      center={initialCenter}
-      zoom={initialZoom}
-      scrollWheelZoom={true}
-      style={{ height: "700px", width: "100%" }}
-      className="rounded-lg shadow-md"
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        maxZoom={19}
-      />
+  // Hotspot overlay GeoJSON is re-keyed per layer so toggling one
+  // off-then-on cleanly drops the Leaflet sources rather than mutating
+  // them in place (which used to leak DOM nodes on rapid retoggles).
+  const kdeData = hotspotLayers?.enabled.kde ? hotspotLayers.data.kde : null;
+  const giData = hotspotLayers?.enabled.gi_star
+    ? hotspotLayers.data.gi_star
+    : null;
+  const hdbData = hotspotLayers?.enabled.hdbscan
+    ? hotspotLayers.data.hdbscan
+    : null;
 
-      {displayedGeoJson && (
-        <GeoJSON
-          key={layerKey}
-          data={displayedGeoJson}
-          onEachFeature={onEachEnrichedFeature}
-          pointToLayer={(_feature, latlng) => {
-            return L.marker(latlng, { icon: cameraIcon });
-          }}
+  return (
+    <Box sx={{ position: "relative" }}>
+      <MapContainer
+        center={initialCenter}
+        zoom={initialZoom}
+        scrollWheelZoom={true}
+        style={{ height: "700px", width: "100%" }}
+        className="rounded-lg shadow-md"
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={19}
+        />
+
+        {/* Order matters: KDE underneath, Gi* over it, HDBSCAN top —
+            denser/more-specific layers paint last so hovers hit them
+            first. */}
+        {kdeData && <KDEContourLayer key="kde-layer" data={kdeData} />}
+        {giData && <GiStarHexLayer key="gi-layer" data={giData} />}
+        {hdbData && <HDBSCANPolygonLayer key="hdb-layer" data={hdbData} />}
+
+        {displayedGeoJson && (
+          <GeoJSON
+            key={layerKey}
+            data={displayedGeoJson}
+            onEachFeature={onEachEnrichedFeature}
+            pointToLayer={(_feature, latlng) => {
+              return L.marker(latlng, { icon: cameraIcon });
+            }}
+          />
+        )}
+        {enrichedGeoJson && <RecenterAutomatically geoJson={enrichedGeoJson} />}
+      </MapContainer>
+      {controlsOverlay}
+      {hotspotLayers && (
+        <HotspotLegends
+          showKDE={!!hotspotLayers.enabled.kde && !!hotspotLayers.data.kde}
+          showGiStar={
+            !!hotspotLayers.enabled.gi_star && !!hotspotLayers.data.gi_star
+          }
+          showHDBSCAN={
+            !!hotspotLayers.enabled.hdbscan && !!hotspotLayers.data.hdbscan
+          }
         />
       )}
-      {enrichedGeoJson && <RecenterAutomatically geoJson={enrichedGeoJson} />}
-    </MapContainer>
+    </Box>
   );
 };
 
