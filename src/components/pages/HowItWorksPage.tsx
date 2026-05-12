@@ -428,6 +428,22 @@ function HowItWorksPage() {
                     density evaluated on a metric grid; the heatmap is derived
                     from it rather than from raw points.
                   </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      color: "text.secondary",
+                      fontStyle: "italic",
+                      mt: 0.25,
+                    }}
+                  >
+                    Note: the current KDE is <em>planar</em> — kernels radiate
+                    isotropically in 2D, so contours can extend over water or
+                    parks where no pedestrian could be watched. A network-
+                    constrained variant that follows the road graph is planned
+                    and will ship as a separate, independently toggleable layer;
+                    planar KDE remains for fast look-and-feel.
+                  </Typography>
                 </Box>
                 <Box component="li">
                   <Typography variant="body2" sx={{ color: "text.secondary" }}>
