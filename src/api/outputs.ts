@@ -129,3 +129,38 @@ export const getHotspotPolygonsGeoJson = (
   city: string,
 ): Promise<HotspotFeatureCollection> =>
   fetchHotspotGeoJson(city, "hotspot_polygons.geojson");
+
+/**
+ * Headline density-metric JSON: cameras-per-road-km plus the
+ * sanity-check denominators (total cameras / road-km / area km²).
+ * Schema mirrors the backend's ``DensityMetrics`` dataclass — values
+ * are rounded server-side so the UI doesn't need to.
+ *
+ * 404 when the artifact wasn't generated for the run (BASIC scenario
+ * with the toggle off, or an OSMnx download failure). Callers should
+ * treat the 404 as "metric unavailable" rather than an error — the
+ * callout falls back to a captioned placeholder.
+ */
+export interface DensityMetrics {
+  total_cameras: number;
+  total_road_km: number;
+  cameras_per_road_km: number;
+  area_km2: number;
+  cameras_per_km2: number;
+  provenance: {
+    city: string;
+    country: string | null;
+    network_type: string;
+    graph_hash: string;
+    area_source: string;
+  };
+}
+
+export const getDensityMetrics = async (
+  city: string,
+): Promise<DensityMetrics> => {
+  const response = await api.get<DensityMetrics>(
+    `/outputs/${city}/density_metrics.json`,
+  );
+  return response.data;
+};
