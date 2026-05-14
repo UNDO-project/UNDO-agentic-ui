@@ -462,8 +462,9 @@ function HowItWorksPage() {
                 <Box component="li">
                   <Typography variant="body2" sx={{ color: "text.secondary" }}>
                     <strong>Cameras per road-km</strong> — a single citable
-                    headline figure that normalises by the pedestrian network
-                    humans actually use.
+                    headline figure for cross-city camera prevalence; normalised
+                    by road length so unbuilt land (parks, water) doesn't dilute
+                    the denominator.
                   </Typography>
                 </Box>
               </Box>
@@ -472,8 +473,8 @@ function HowItWorksPage() {
                 sx={{ display: "block", color: "text.secondary", mt: 1.5 }}
               >
                 Method references: Amnesty International,{" "}
-                <em>Decode Surveillance NYC</em>; Stanford RegLab,{" "}
-                <em>Surveilling Surveillance</em> (2021).
+                <em>Decode Surveillance NYC</em>; Stanford Computational Policy
+                Lab, <em>Surveilling Surveillance</em> (2021).
               </Typography>
             </Paper>
 
