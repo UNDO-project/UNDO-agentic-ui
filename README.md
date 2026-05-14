@@ -57,12 +57,12 @@ different question — and any combination can be toggled on at once.
    journalists recognise from ArcGIS/QGIS "Hot Spot Analysis", with
    FDR-adjusted p-values.
 4. **Cameras per road-km** — a single citable headline figure for
-   cross-city comparison (Stanford RegLab,
+   cross-city comparison (Stanford Computational Policy Lab,
    _Surveilling Surveillance_, 2021), shown above the Statistics
    tab. Reuses the routing agent's OSMnx graph cache.
 
 Method references: Amnesty International,
-_Decode Surveillance NYC_; Stanford RegLab, _Surveilling Surveillance_
+_Decode Surveillance NYC_; Stanford Computational Policy Lab, _Surveilling Surveillance_
 (2021).
 
 ## Stack
