@@ -71,9 +71,11 @@ function AboutPage() {
           analyzing the surveillance infrastructure of cities and, when asked,
           computing pedestrian routes that minimize exposure to it. Surveillance
           density is reported as a citable cameras-per-road-km headline figure,
-          plus three independent map layers — a KDE density surface, an HDBSCAN
-          cluster polygon set, and a Getis-Ord Gi* statistical hex grid — that
-          users can toggle on top of the camera map.
+          plus four independent map layers — a KDE density surface, an HDBSCAN
+          cluster polygon set, a Getis-Ord Gi* statistical hex grid, and an
+          administrative-district choropleth that classifies each camera's
+          operator (police / other identified / untagged) — that users can
+          toggle on top of the camera map.
         </Typography>
         <Typography variant="body1" paragraph sx={{ color: "text.secondary" }}>
           A <strong>Scraper Agent</strong> pulls camera locations from

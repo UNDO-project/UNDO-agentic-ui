@@ -44,6 +44,11 @@ export interface OutputOverrides {
   plot_zone_sensitivity?: boolean;
   plot_sensitivity_reasons?: boolean;
   plot_hotspots?: boolean;
+  /**
+   * Opt-in administrative-district aggregation (police-cameras-per-district).
+   * Never enabled by a preset — only surfaces when the user checks it.
+   */
+  district_aggregation?: boolean;
 }
 
 /**
@@ -69,6 +74,13 @@ export interface PipelineRequest {
   overrides?: OutputOverrides;
   routing_config?: RoutingConfig;
   force_refresh?: boolean;
+  /**
+   * OSM ``admin_level`` for the district-aggregation layer. A number,
+   * not a toggle, so it rides the request directly rather than in
+   * ``overrides``. Omit to let the backend fall back to its
+   * ``DistrictSettings`` default.
+   */
+  district_admin_level?: number;
 }
 
 export interface TaskResult {

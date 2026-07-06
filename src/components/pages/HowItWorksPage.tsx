@@ -40,7 +40,7 @@ const pipelineSteps = [
     agent: "Analyzer Agent",
     optional: false,
     description:
-      "The Analyzer Agent processes camera data using a local LLM (no external API calls). It enriches each camera with context and runs a four-layer hotspot stack: a planar KDE density surface for the smooth heatmap, an HDBSCAN polygon clustering of dense pockets, a Getis-Ord Gi* hex grid for statistical hot/cold classification, and a cameras-per-road-km headline metric for cross-city comparison. Statistical charts and an LLM-written city report follow when the scenario asks for them.",
+      "The Analyzer Agent processes camera data using a local LLM (no external API calls). It enriches each camera with context and runs a four-layer hotspot stack: a planar KDE density surface for the smooth heatmap, an HDBSCAN polygon clustering of dense pockets, a Getis-Ord Gi* hex grid for statistical hot/cold classification, and a cameras-per-road-km headline metric for cross-city comparison. An opt-in district-aggregation layer additionally classifies each camera's operator (police / other identified / untagged) and tallies the classes across OSM administrative districts. Statistical charts and an LLM-written city report follow when the scenario asks for them.",
   },
   {
     label: "Route Computation",
@@ -114,6 +114,11 @@ const outputGroups: {
       {
         name: "Density metrics",
         description: "Headline cameras-per-road-km + cameras-per-km² (JSON)",
+      },
+      {
+        name: "District aggregation",
+        description:
+          "Per-district camera counts by operator class (police / other / untagged) as GeoJSON + CSV",
       },
       {
         name: "Route GeoJSON",
@@ -465,6 +470,15 @@ function HowItWorksPage() {
                     headline figure for cross-city camera prevalence; normalised
                     by road length so unbuilt land (parks, water) doesn't dilute
                     the denominator.
+                  </Typography>
+                </Box>
+                <Box component="li">
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    <strong>District aggregation</strong> — an opt-in layer that
+                    tallies cameras into OSM administrative districts and
+                    classifies each camera's operator (police / other identified
+                    / untagged) via the local LLM, so the choropleth can show
+                    police-operated cameras per district.
                   </Typography>
                 </Box>
               </Box>

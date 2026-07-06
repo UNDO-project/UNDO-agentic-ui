@@ -47,6 +47,8 @@ const PRESET_DEFAULTS: Record<Scenario, Required<OutputOverrides>> = {
     plot_zone_sensitivity: false,
     plot_sensitivity_reasons: false,
     plot_hotspots: false,
+    // Opt-in; never seeded on by a preset (mirrors the backend baseline).
+    district_aggregation: false,
   },
   full: {
     generate_geojson: true,
@@ -57,6 +59,7 @@ const PRESET_DEFAULTS: Record<Scenario, Required<OutputOverrides>> = {
     plot_zone_sensitivity: true,
     plot_sensitivity_reasons: true,
     plot_hotspots: true,
+    district_aggregation: false,
   },
 };
 
@@ -74,6 +77,7 @@ const TOGGLE_ROWS: Array<{ key: keyof OutputOverrides; label: string }> = [
   { key: "generate_heatmap", label: "Heatmap (HTML)" },
   { key: "generate_hotspots", label: "Hotspots GeoJSON" },
   { key: "plot_hotspots", label: "Hotspots scatter plot (PNG)" },
+  { key: "district_aggregation", label: "District aggregation (GeoJSON)" },
 ];
 
 interface PipelineConfigProps {
@@ -94,6 +98,9 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
   const [scenario, setScenario] = useState<Scenario>("basic");
   const [overrides, setOverrides] = useState<OutputOverrides>({});
   const [advancedOpen, setAdvancedOpen] = useState<boolean>(false);
+  // District admin level rides the request as a number, not a toggle.
+  // Kept as a string so an empty field means "use the backend default".
+  const [districtAdminLevel, setDistrictAdminLevel] = useState<string>("");
   const [enableRouting, setEnableRouting] = useState<boolean>(false);
   const [startPoint, setStartPoint] = useState<{
     lat: number;
@@ -245,6 +252,15 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
     // who never opened the Advanced section.
     if (Object.keys(overrides).length > 0) {
       request.overrides = overrides;
+    }
+    // Thread the admin level separately (it's a number, not a toggle) and
+    // only when the district layer is actually on and a value was typed.
+    // An empty field lets the backend fall back to its DistrictSettings
+    // default.
+    const districtOn = effectiveValue("district_aggregation");
+    const adminLevel = parseInt(districtAdminLevel, 10);
+    if (districtOn && Number.isFinite(adminLevel)) {
+      request.district_admin_level = adminLevel;
     }
     onStartScan(request);
   };
@@ -423,6 +439,20 @@ const PipelineConfig: React.FC<PipelineConfigProps> = ({
                 />
               ))}
             </FormGroup>
+            {effectiveValue("district_aggregation") && (
+              <Box className="mt-3">
+                <TextField
+                  label="District admin level"
+                  type="number"
+                  size="small"
+                  value={districtAdminLevel}
+                  onChange={(e) => setDistrictAdminLevel(e.target.value)}
+                  fullWidth
+                  slotProps={{ htmlInput: { min: 1, max: 12 } }}
+                  helperText="OSM boundary admin_level (e.g. 9 for Malmö boroughs). Leave blank for the backend default."
+                />
+              </Box>
+            )}
           </Box>
         </Collapse>
       </FormControl>

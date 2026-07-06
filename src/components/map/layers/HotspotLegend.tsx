@@ -8,6 +8,7 @@
 
 import React from "react";
 import { Box, Stack, Typography } from "@mui/material";
+import { bandLabel, type DistrictBand } from "./districtScale";
 
 interface LegendBoxProps {
   title: string;
@@ -61,14 +62,20 @@ interface HotspotLegendsProps {
   showKDE: boolean;
   showGiStar: boolean;
   showHDBSCAN: boolean;
+  showDistricts: boolean;
+  /** Quantile bands for the district choropleth (light → dark). */
+  districtBands: DistrictBand[];
 }
 
 const HotspotLegends: React.FC<HotspotLegendsProps> = ({
   showKDE,
   showGiStar,
   showHDBSCAN,
+  showDistricts,
+  districtBands,
 }) => {
-  if (!showKDE && !showGiStar && !showHDBSCAN) return null;
+  const districtVisible = showDistricts && districtBands.length > 0;
+  if (!showKDE && !showGiStar && !showHDBSCAN && !districtVisible) return null;
 
   return (
     <Box
@@ -116,6 +123,18 @@ const HotspotLegends: React.FC<HotspotLegendsProps> = ({
               outline: "#2e7d32",
             },
           ]}
+        />
+      )}
+      {districtVisible && (
+        <LegendBox
+          title="Police cameras / district"
+          // Dark (highest range) at top, matching a conventional
+          // choropleth legend — bands come light → dark, so reverse.
+          rows={[...districtBands].reverse().map((b) => ({
+            swatch: b.color,
+            label: bandLabel(b),
+            outline: "#7f2704",
+          }))}
         />
       )}
     </Box>

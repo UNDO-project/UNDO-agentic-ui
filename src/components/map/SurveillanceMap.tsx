@@ -15,6 +15,8 @@ import { matchesMapCameraFilter } from "./cameraFilter";
 import KDEContourLayer from "./layers/KDEContourLayer";
 import GiStarHexLayer from "./layers/GiStarHexLayer";
 import HDBSCANPolygonLayer from "./layers/HDBSCANPolygonLayer";
+import DistrictChoroplethLayer from "./layers/DistrictChoroplethLayer";
+import { computeDistrictBands } from "./layers/districtScale";
 import HotspotLegends from "./layers/HotspotLegend";
 import type { HotspotLayerState } from "./layers/hotspotLayerState";
 
@@ -148,6 +150,15 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
   const hdbData = hotspotLayers?.enabled.hdbscan
     ? hotspotLayers.data.hdbscan
     : null;
+  const districtData = hotspotLayers?.enabled.districts
+    ? hotspotLayers.data.districts
+    : null;
+  // Quantile bands derived from the loaded districts — shared by the
+  // choropleth fill and its legend so both classify identically.
+  const districtBands = useMemo(
+    () => computeDistrictBands(districtData),
+    [districtData],
+  );
 
   return (
     <Box sx={{ position: "relative" }}>
@@ -164,9 +175,17 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
           maxZoom={19}
         />
 
-        {/* Order matters: KDE underneath, Gi* over it, HDBSCAN top —
+        {/* Order matters: districts at the very bottom (large area fills
+            shouldn't steal hovers), then KDE, Gi* over it, HDBSCAN top —
             denser/more-specific layers paint last so hovers hit them
             first. */}
+        {districtData && (
+          <DistrictChoroplethLayer
+            key="district-layer"
+            data={districtData}
+            bands={districtBands}
+          />
+        )}
         {kdeData && <KDEContourLayer key="kde-layer" data={kdeData} />}
         {giData && <GiStarHexLayer key="gi-layer" data={giData} />}
         {hdbData && <HDBSCANPolygonLayer key="hdb-layer" data={hdbData} />}
@@ -193,6 +212,10 @@ const SurveillanceMap: React.FC<SurveillanceMapProps> = ({
           showHDBSCAN={
             !!hotspotLayers.enabled.hdbscan && !!hotspotLayers.data.hdbscan
           }
+          showDistricts={
+            !!hotspotLayers.enabled.districts && !!hotspotLayers.data.districts
+          }
+          districtBands={districtBands}
         />
       )}
     </Box>
