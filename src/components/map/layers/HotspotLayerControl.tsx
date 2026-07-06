@@ -28,6 +28,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import LayersIcon from "@mui/icons-material/Layers";
 import {
   getDensityGeoJson,
+  getDistrictsGeoJson,
   getGiStarGeoJson,
   getHotspotPolygonsGeoJson,
   type HotspotFeatureCollection,
@@ -51,6 +52,7 @@ const LAYER_LABELS: Record<HotspotLayerKey, string> = {
   kde: "KDE density contours",
   gi_star: "Gi* hot/cold hexes",
   hdbscan: "HDBSCAN polygons",
+  districts: "Districts (police cameras)",
 };
 
 const LAYER_FETCHERS: Record<
@@ -60,6 +62,7 @@ const LAYER_FETCHERS: Record<
   kde: getDensityGeoJson,
   gi_star: getGiStarGeoJson,
   hdbscan: getHotspotPolygonsGeoJson,
+  districts: getDistrictsGeoJson,
 };
 
 // Empty-state hints stay with the control (where the user sees them)
@@ -69,6 +72,7 @@ const EMPTY_HINTS: Record<HotspotLayerKey, string> = {
   kde: "No density contours — re-run with --heatmap.",
   gi_star: "No Gi* layer — re-run with --gi-star.",
   hdbscan: "No clusters detected — try --hotspots or a denser city.",
+  districts: "No districts — re-run with --district-aggregation.",
 };
 
 const HotspotLayerControl: React.FC<HotspotLayerControlProps> = ({
