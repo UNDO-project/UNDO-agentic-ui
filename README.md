@@ -18,13 +18,16 @@ report, and an optional low-surveillance walking route.
 - **Dashboard tabs**:
   - **Camera Map** — Leaflet markers with an operator / privacy /
     sensitivity filter pane, plus a floating **Hotspot Layers** control
-    that toggles three independent overlays:
+    that toggles four independent overlays:
     - _KDE density contours_ — planar kernel-density polygons at the
       50/75/90/95 percentiles.
     - _Gi\* hot/cold hexes_ — Getis-Ord Gi\* hex grid with FDR-adjusted
       p-values, classified hot/cold/not-significant.
     - _HDBSCAN polygons_ — density-based cluster hulls shaded by
       cluster persistence.
+    - _Districts (police cameras)_ — an opt-in choropleth of OSM
+      administrative districts, filled by police-operated camera count,
+      with per-class counts + untagged share in the hover tooltip.
       Each layer loads its GeoJSON lazily and caches it for the
       session, scoped to the current `taskId` so a fresh run refetches.
       Per-layer inline legends and hover tooltips ship alongside each
@@ -32,10 +35,12 @@ report, and an optional low-surveillance walking route.
   - **Heatmap** — folium HTML (derived from the KDE surface) embedded as
     an iframe.
   - **Statistics** — opens with a **cameras-per-road-km** headline
-    callout next to **cameras-per-km²**, followed by privacy,
-    sensitivity, zone-sensitivity, operator, manufacturer, and
-    install-timeline charts (each with a captioned empty state when
-    the underlying data is missing).
+    callout next to **cameras-per-km²**, then (when the district layer
+    was run) a **district summary** callout with the citywide
+    police-camera total, untagged share, and a **districts CSV**
+    download, followed by privacy, sensitivity, zone-sensitivity,
+    operator, manufacturer, and install-timeline charts (each with a
+    captioned empty state when the underlying data is missing).
   - **Report** — markdown city report rendered with `react-markdown`.
   - **Route** _(optional)_ — folium map of the chosen low-surveillance
     walking route.
@@ -60,6 +65,14 @@ different question — and any combination can be toggled on at once.
    cross-city comparison (Stanford Computational Policy Lab,
    _Surveilling Surveillance_, 2021), shown above the Statistics
    tab. Reuses the routing agent's OSMnx graph cache.
+
+An opt-in **district aggregation** layer sits alongside these: it
+tallies cameras into OSM administrative districts (configurable
+`admin_level`) and classifies each camera's operator into police /
+other-identified / untagged via the local LLM. It renders as the
+fourth map overlay (a police-count choropleth) plus a Statistics-tab
+summary callout and a downloadable per-district CSV. Enable it from the
+scan form's **Advanced → District aggregation** toggle.
 
 Method references: Amnesty International,
 _Decode Surveillance NYC_; Stanford Computational Policy Lab, _Surveilling Surveillance_
@@ -110,9 +123,9 @@ src/
 │   ├── form/         # PipelineConfig — scan + routing form
 │   ├── monitor/      # ProgressMonitor + PipelineStepper
 │   ├── dashboard/    # Dashboard, StatsPanel
-│   │   └── stats/    # DensityMetricsCallout (cameras-per-road-km tile)
+│   │   └── stats/    # DensityMetricsCallout, DistrictSummaryCallout
 │   ├── map/          # SurveillanceMap, CameraFilterPanel, MapPicker
-│   │   └── layers/   # KDE / Gi* / HDBSCAN overlays + HotspotLayerControl
+│   │   └── layers/   # KDE / Gi* / HDBSCAN / Districts overlays + HotspotLayerControl
 │   └── ScanWorkflow  # top-level config → monitor → dashboard router
 ├── hooks/            # useSnackbar, useWebSocket
 └── types/api.d.ts    # request / response shapes mirroring the backend
