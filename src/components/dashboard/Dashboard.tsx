@@ -42,6 +42,7 @@ import {
   type HotspotLayerState,
 } from "../map/layers/hotspotLayerState";
 import DensityMetricsCallout from "./stats/DensityMetricsCallout";
+import DistrictSummaryCallout from "./stats/DistrictSummaryCallout";
 import { getPipelineStatus } from "../../api/pipeline";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import type { MapCameraFilter, TaskResult, OutputFile } from "../../types/api";
@@ -636,6 +637,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                     owns its own fetch lifecycle and silently degrades
                     to a captioned placeholder on 404. */}
                 <DensityMetricsCallout city={city} />
+
+                {/* Citywide district/operator summary (Frontend #53).
+                    Self-owned fetch + self-gated CSV button: renders a
+                    captioned placeholder and hides the download when the
+                    district layer wasn't run for this city. */}
+                <DistrictSummaryCallout
+                  city={city}
+                  onDownloadCsv={handleDownload}
+                />
 
                 {chartsLoading && (
                   <Box className="flex flex-col gap-4">
