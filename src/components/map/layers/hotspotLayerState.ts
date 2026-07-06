@@ -12,7 +12,7 @@
 
 import type { HotspotFeatureCollection } from "../../../api/outputs";
 
-export type HotspotLayerKey = "kde" | "gi_star" | "hdbscan";
+export type HotspotLayerKey = "kde" | "gi_star" | "hdbscan" | "districts";
 
 export interface HotspotLayerState {
   enabled: Record<HotspotLayerKey, boolean>;
@@ -22,7 +22,7 @@ export interface HotspotLayerState {
 }
 
 export const initialHotspotLayerState = (): HotspotLayerState => ({
-  enabled: { kde: false, gi_star: false, hdbscan: false },
+  enabled: { kde: false, gi_star: false, hdbscan: false, districts: false },
   data: {},
   loading: {},
   errors: {},
