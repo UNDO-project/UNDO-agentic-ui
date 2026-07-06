@@ -131,6 +131,48 @@ export const getHotspotPolygonsGeoJson = (
   fetchHotspotGeoJson(city, "hotspot_polygons.geojson");
 
 /**
+ * Administrative-district choropleth (``<city>_districts.geojson``) —
+ * one polygon per district carrying ``police_count`` and the per-class
+ * counts. The citywide totals ride as a top-level ``summary`` member on
+ * the FeatureCollection (see ``getDistrictsSummary``).
+ */
+export const getDistrictsGeoJson = (
+  city: string,
+): Promise<HotspotFeatureCollection> =>
+  fetchHotspotGeoJson(city, "districts.geojson");
+
+/**
+ * Citywide district summary, read from the ``summary`` member of the
+ * districts GeoJSON so the callout needs no dedicated backend endpoint.
+ * Fields mirror the backend ``aggregate_cameras_by_district`` summary.
+ *
+ * Rejects (404 or missing member) when the district layer wasn't run —
+ * the callout treats that as "unavailable" rather than an error.
+ */
+export interface DistrictSummary {
+  districts: number;
+  total_cameras: number;
+  cameras_in_districts: number;
+  police_count: number;
+  other_identified_count: number;
+  untagged_count: number;
+  unassigned: number;
+  untagged_share: number;
+}
+
+export const getDistrictsSummary = async (
+  city: string,
+): Promise<DistrictSummary> => {
+  const response = await api.get<{ summary?: DistrictSummary }>(
+    `/outputs/${city}/districts.geojson`,
+  );
+  if (!response.data?.summary) {
+    throw new Error("District summary missing from payload");
+  }
+  return response.data.summary;
+};
+
+/**
  * Headline density-metric JSON: cameras-per-road-km plus the
  * sanity-check denominators (total cameras / road-km / area km²).
  * Schema mirrors the backend's ``DensityMetrics`` dataclass — values
